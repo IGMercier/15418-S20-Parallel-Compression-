@@ -19,10 +19,12 @@
 
 using namespace std;
 
+using pixel_t = uint8_t;
+
+
 // TODO: Change the name of these variables to height and width. n and m
 // does not make it clear.
 int n, m;
-
 
 // Useful forward references.
 void dct(float **DCTMatrix, float **Matrix, int N, int M);
@@ -91,7 +93,7 @@ void dct(float **DCTMatrix, float **Matrix, int N, int M) {
 }
 
 
-void compress(uint8_t *img, int width, int height) {
+void compress(pixel_t *img, int width, int height) {
     n = height;
     m = width;
 
@@ -104,7 +106,7 @@ void compress(uint8_t *img, int width, int height) {
     #pragma omp parallel for schedule(runtime)
     for (int i = 0; i < n; i++) {
     for (int j = 0; j < m; j++) {
-        uint8_t *bgrPixel = img + getOffset(width, i, j);
+        pixel_t *bgrPixel = img + getOffset(width, i, j);
         grayContent[i][j] = (bgrPixel[0] + bgrPixel[1] + bgrPixel[2]) / 3;
     }
     }
@@ -135,8 +137,8 @@ void compress(uint8_t *img, int width, int height) {
     #pragma omp parallel for schedule(runtime)
     for (int i = 0; i < n; i++) {
     for (int j = 0; j < m; j++) {
-        uint8_t pixelValue = finalMatrixDecompress[i][j];
-        uint8_t *bgrPixel = img + getOffset(width, i, j);
+        pixel_t pixelValue = finalMatrixDecompress[i][j];
+        pixel_t *bgrPixel = img + getOffset(width, i, j);
         bgrPixel[0] = pixelValue;
         bgrPixel[1] = pixelValue;
         bgrPixel[2] = pixelValue;
@@ -163,7 +165,7 @@ int main(int argc, char **argv) {
     auto start = chrono::high_resolution_clock::now();
     // Read and compress the image
     int width, height, bpp;
-    uint8_t *img = stbi_load(path.data(), &width, &height, &bpp, NUM_CHANNELS);
+    pixel_t *img = stbi_load(path.data(), &width, &height, &bpp, NUM_CHANNELS);
     compress(img, width, height);
     stbi_image_free(img);
     // End time
