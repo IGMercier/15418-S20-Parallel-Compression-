@@ -16,6 +16,8 @@
 #define NUM_THREADS 8
 #define NUM_CHANNELS 3
 
+#define TIMER
+
 using namespace std;
 
 using pixel_t = uint8_t;
@@ -48,8 +50,8 @@ void print_mat(float **m, int N, int M) {
 
 
 void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
-    float **smallMatrix = calloc_mat(dimX, dimY);
     float **DCTMatrix = calloc_mat(dimX, dimY);
+    float **smallMatrix = calloc_mat(n,m);
 
     #pragma omp parallel for schedule (runtime)
     for (int i = 0; i < n; i += dimX) {
@@ -59,7 +61,7 @@ void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
             smallMatrix[k-i][l-j] = grayContent[k][l];
         }
         }
-        
+
         dct(DCTMatrix, smallMatrix, dimX, dimY);
         for (int k=i; k<i+pixel && k<n; k++) {
         for (int l=j; l<j+pixel && l<m ;l++) {
@@ -75,6 +77,7 @@ void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
 
 
 void dct(float **DCTMatrix, float **Matrix, int N, int M) {
+
     int i, j, u, v;
     #pragma omp parallel for schedule(runtime)
     for (u = 0; u < N; ++u) {
@@ -128,9 +131,29 @@ void compress(pixel_t *img, int width, int height) {
     n = add_rows + n;  // making rows as a multiple of 8
     m = add_columns + m;  // making columns as a multiple of 8
 
+#ifdef TIMER
+    auto start = chrono::high_resolution_clock::now();
+    divideMatrix(grayContent, dimX, dimY, n, m);
+    auto end = chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end - start;
+    cout<<"divideMatrix time: "<<diff.count()<<endl;
+
+    start = chrono::high_resolution_clock::now();
+    quantize(n, m);
+    end = chrono::high_resolution_clock::now();
+    diff = end - start;
+    cout<<"quantize time: "<<diff.count()<<endl;
+
+    start = chrono::high_resolution_clock::now();
+    dequantize(n, m);
+    end = chrono::high_resolution_clock::now();
+    diff = end - start;
+    cout<<"dequantize time: "<<diff.count()<<endl;
+#else
     divideMatrix(grayContent, dimX, dimY, n, m);
     quantize(n, m);
     dequantize(n, m);
+#endif
 
     #pragma omp parallel for schedule(runtime)
     for (int i = 0; i < n; i++) {
@@ -157,19 +180,19 @@ int main(int argc, char **argv) {
     string image_ext = ".jpg";
     string path = image_dir + argv[1] + image_ext;
 
-    cout << "Processing image: " << path << endl;
-
+    cout << "Processing image: " << path;
     // Start time
     auto start = chrono::high_resolution_clock::now();
     // Read and compress the image
     int width, height, bpp;
     pixel_t *img = stbi_load(path.data(), &width, &height, &bpp, NUM_CHANNELS);
+    cout << "Size: ("<<width<<", "<<height<<")"<<endl;
     compress(img, width, height);
     stbi_image_free(img);
     // End time
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
-
+    cout<<"Total time: "<<diff.count()<<endl;
     fprintf(fp, "%f ", diff.count());
     fclose(fp);
     return 0;
