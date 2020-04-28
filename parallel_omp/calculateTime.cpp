@@ -16,7 +16,7 @@ int main(int argc, char **argv)
 
     float ans=0.0f,temp;
     while(fscanf(fp,"%f ",&temp)==1){
-    ans+=temp;
+        ans+=temp;
     }
     cout<<ans<<endl;
     MyFile<<5<<','<<ans<<endl;

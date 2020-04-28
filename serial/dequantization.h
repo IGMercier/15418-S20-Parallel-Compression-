@@ -83,6 +83,7 @@ void dequantizeBlock(int R,int C)
 void dequantize(int n,int m)
 {
  int i,j;
+//  TODO: Remove this pragma from the serial code.
  #pragma omp parallel for schedule(runtime)
  for(i=1;i<=n/pixel;i++){
   for(j=1;j<=m/pixel;j++){
