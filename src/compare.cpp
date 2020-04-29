@@ -7,7 +7,6 @@
 
 #include <string>
 #include <iostream>
-#include "opencv2/highgi/hiighgui.hpp"
 #include <fstream>
 
 #define TOLERANCE 1

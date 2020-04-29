@@ -1,6 +1,6 @@
 #!/bin/sh
 rm info.txt
-g++ compression.cpp -std=c++11 -fopenmp
+g++ compression.cpp -std=c++11 -fopenmp -O0
 a=0
 while [ "$a" -lt 30 ]
 do

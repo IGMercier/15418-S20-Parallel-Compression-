@@ -6,21 +6,23 @@
 #include <fstream>
 #include <string>
 
+// #define STBI_NO_SIMD
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
-#include "../include/stb_image.h"
-#include "../include/stb_image_write.h"
+#include "../../include/stb_image.h"
+#include "../../include/stb_image_write.h"
 #include "dequantization.h"
 
-#define NUM_THREADS 8
 #define NUM_CHANNELS 3
+#define NUM_THREADS 1 //total number of threads
 
 #define TIMER
 
 using namespace std;
 
-using pixel_t = uint8_t;
+using pixel_t =  uint8_t;
+
 
 // TODO: Change the name of these variables to height and width. n and m
 // does not make it clear.
@@ -50,8 +52,8 @@ void print_mat(float **m, int N, int M) {
 
 
 void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
+    float **smallMatrix = calloc_mat(dimX, dimY);
     float **DCTMatrix = calloc_mat(dimX, dimY);
-    float **smallMatrix = calloc_mat(n,m);
 
     #pragma omp parallel for schedule (runtime)
     for (int i = 0; i < n; i += dimX) {
@@ -77,7 +79,6 @@ void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
 
 
 void dct(float **DCTMatrix, float **Matrix, int N, int M) {
-
     int i, j, u, v;
     #pragma omp parallel for schedule(runtime)
     for (u = 0; u < N; ++u) {
@@ -131,12 +132,14 @@ void compress(pixel_t *img, int width, int height) {
     n = add_rows + n;  // making rows as a multiple of 8
     m = add_columns + m;  // making columns as a multiple of 8
 
+    // TODO: Check if std::cout is time consuming. If yes, remove it and print
+    // the timings after the compression.
 #ifdef TIMER
     auto start = chrono::high_resolution_clock::now();
     divideMatrix(grayContent, dimX, dimY, n, m);
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
-    cout << diff.count() << ", ";
+    cout << diff.count() <<", ";
 
     start = chrono::high_resolution_clock::now();
     quantize(n, m);
@@ -148,7 +151,7 @@ void compress(pixel_t *img, int width, int height) {
     dequantize(n, m);
     end = chrono::high_resolution_clock::now();
     diff = end - start;
-    cout << diff.count()<< ", ";
+    cout << diff.count() << ", ";
 #else
     divideMatrix(grayContent, dimX, dimY, n, m);
     quantize(n, m);
@@ -174,26 +177,37 @@ int main(int argc, char **argv) {
     FILE *fp;
     fp = fopen("./info.txt", "a+");
     // Set the number of threads
-    omp_set_num_threads(NUM_THREADS);
+    // omp_set_num_threads(NUM_THREADS);
 
-    string image_dir = "../images/";
+    string image_dir = "../../images/";
     string image_ext = ".jpg";
     string path = image_dir + argv[1] + image_ext;
 
-    //cout << "[" << path<<", ";
-    cout << "[" << argv[1] <<", ";
+
+#ifdef TIMER
+    cout << "[" << argv[1] << ", ";
     // Start time
     auto start = chrono::high_resolution_clock::now();
+#endif
+
     // Read and compress the image
     int width, height, bpp;
     pixel_t *img = stbi_load(path.data(), &width, &height, &bpp, NUM_CHANNELS);
+
+#ifdef TIMER
     cout << width << ", " << height << ", ";
+#endif
+
     compress(img, width, height);
     stbi_image_free(img);
+
+#ifdef TIMER
     // End time
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
     cout << diff.count() << "]" << endl;
+#endif
+
     fprintf(fp, "%f ", diff.count());
     fclose(fp);
     return 0;
