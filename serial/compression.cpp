@@ -17,9 +17,11 @@
 #define NUM_CHANNELS 3
 #define NUM_THREADS 1 //total number of threads
 
+#define TIMER
+
 using namespace std;
 
-using pixel_t = uint8_t;
+using pixel_t =  uint8_t;
 
 
 // TODO: Change the name of these variables to height and width. n and m
@@ -61,7 +63,7 @@ void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
             smallMatrix[k-i][l-j] = grayContent[k][l];
         }
         }
-        
+
         dct(DCTMatrix, smallMatrix, dimX, dimY);
         for (int k=i; k<i+pixel && k<n; k++) {
         for (int l=j; l<j+pixel && l<m ;l++) {
@@ -130,9 +132,29 @@ void compress(pixel_t *img, int width, int height) {
     n = add_rows + n;  // making rows as a multiple of 8
     m = add_columns + m;  // making columns as a multiple of 8
 
+#ifdef TIMER
+    auto start = chrono::high_resolution_clock::now();
+    divideMatrix(grayContent, dimX, dimY, n, m);
+    auto end = chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end - start;
+    cout << diff.count() <<", ";
+
+    start = chrono::high_resolution_clock::now();
+    quantize(n, m);
+    end = chrono::high_resolution_clock::now();
+    diff = end - start;
+    cout << diff.count() << ", ";
+
+    start = chrono::high_resolution_clock::now();
+    dequantize(n, m);
+    end = chrono::high_resolution_clock::now();
+    diff = end - start;
+    cout << diff.count() << ", ";
+#else
     divideMatrix(grayContent, dimX, dimY, n, m);
     quantize(n, m);
     dequantize(n, m);
+#endif
 
     #pragma omp parallel for schedule(runtime)
     for (int i = 0; i < n; i++) {
@@ -159,18 +181,30 @@ int main(int argc, char **argv) {
     string image_ext = ".jpg";
     string path = image_dir + argv[1] + image_ext;
 
-    cout << "Processing image: " << path << endl;
-    
+
+#ifdef TIMER
+    cout << "[" << argv[1] << ", ";
     // Start time
     auto start = chrono::high_resolution_clock::now();
+#endif
+
     // Read and compress the image
     int width, height, bpp;
     pixel_t *img = stbi_load(path.data(), &width, &height, &bpp, NUM_CHANNELS);
+
+#ifdef TIMER
+    cout << width << ", " << height << ", ";
+#endif
+
     compress(img, width, height);
     stbi_image_free(img);
+
+#ifdef TIMER
     // End time
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
+    cout << diff.count() << "]" << endl;
+#endif
 
     fprintf(fp, "%f ", diff.count());
     fclose(fp);

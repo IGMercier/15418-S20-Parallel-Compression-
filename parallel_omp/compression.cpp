@@ -136,19 +136,19 @@ void compress(pixel_t *img, int width, int height) {
     divideMatrix(grayContent, dimX, dimY, n, m);
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
-    cout<<"divideMatrix time: "<<diff.count()<<endl;
+    cout << diff.count() << ", ";
 
     start = chrono::high_resolution_clock::now();
     quantize(n, m);
     end = chrono::high_resolution_clock::now();
     diff = end - start;
-    cout<<"quantize time: "<<diff.count()<<endl;
+    cout << diff.count() << ", ";
 
     start = chrono::high_resolution_clock::now();
     dequantize(n, m);
     end = chrono::high_resolution_clock::now();
     diff = end - start;
-    cout<<"dequantize time: "<<diff.count()<<endl;
+    cout << diff.count()<< ", ";
 #else
     divideMatrix(grayContent, dimX, dimY, n, m);
     quantize(n, m);
@@ -180,19 +180,20 @@ int main(int argc, char **argv) {
     string image_ext = ".jpg";
     string path = image_dir + argv[1] + image_ext;
 
-    cout << "Processing image: " << path;
+    //cout << "[" << path<<", ";
+    cout << "[" << argv[1] <<", ";
     // Start time
     auto start = chrono::high_resolution_clock::now();
     // Read and compress the image
     int width, height, bpp;
     pixel_t *img = stbi_load(path.data(), &width, &height, &bpp, NUM_CHANNELS);
-    cout << "Size: ("<<width<<", "<<height<<")"<<endl;
+    cout << width << ", " << height << ", ";
     compress(img, width, height);
     stbi_image_free(img);
     // End time
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
-    cout<<"Total time: "<<diff.count()<<endl;
+    cout << diff.count() << "]" << endl;
     fprintf(fp, "%f ", diff.count());
     fclose(fp);
     return 0;
