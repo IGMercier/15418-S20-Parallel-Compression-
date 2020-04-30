@@ -1,16 +1,10 @@
-#pragma once
-
 #include<iostream>
 #include<vector>
 #include<algorithm>
 #include<cmath>
-
-// TODO: Replace pixel by PIXEL
+#include<omp.h>
 #define pixel 8
-#define PIXEL 8
-
 using namespace std;
-
 
 int quantArr[8][8]={{16,11,12,14,12,10,16,14},
       {13,14,18,17,16,19,24,40},
@@ -20,66 +14,74 @@ int quantArr[8][8]={{16,11,12,14,12,10,16,14},
       {87,69,55,56,80,109,81,87},
       {95,98,103,104,103,62,77,113},
       {121,112,100,120,92,101,103,99}
-};
+  };
 
-// NOTE: Using a vector representation gives a minor speedup.
-// float globalDCT[3005][3005];
-vector<vector<float>> globalDCT(3005, vector<float>(3005));
+  float globalDCT[3005][3005];
 
-struct INF_COMPRESS {
-    vector<int> v;
-} finalMatrixCompress[3000][3000];
+struct INF_COMPRESS
+{
+  vector<int> v;
+}finalMatrixCompress[3000][3000];
 
 int finalMatrixDecompress[3000][3000];
 
-
-void quantizeBlock(int R, int C) {
-    // Quantization part
-    int block[9][9];
-    // vector<vector<int>> block(9, vector<int>(9));
+void quantizeBlock(int R,int C) {
+    //Quantization part
     int i, j;
 
-    // #pragma omp for schedule(runtime)
-    for (i = 1; i <= pixel; i++) {
-    for (j = 1; j <= pixel; j++) {
-        // #pragma omp atomic
-        block[i][j] = globalDCT[(R-1)*pixel+i-1][(C-1)*pixel+j-1];
-    }
-    }
-
-    vector<int> vRLE(PIXEL * PIXEL);
-    for (i = 1; i <= pixel; i++) {
-    for (j = 1; j <= pixel; j++) {
-        // #pragma omp atomic
-        block[i][j] = (int)round((float)block[i][j] / quantArr[i-1][j-1]);
-        vRLE[(i - 1) * PIXEL + (j - 1)] = block[i][j];
-    }
+    vector<int> vRLE(pixel * pixel);
+    for (i = 0; i < pixel; i++) {
+        for (j = 0; j < pixel; j++) {
+            // block[i][j]=globalDCT[(R-1)*pixel+i-1][(C-1)*pixel+j-1];
+            // block[i][j]=(int)round((float)block[i][j]/quantArr[i-1][j-1]);
+            // vRLE.push_back(block[i][j]);
+            int temp = globalDCT[(R - 1) * pixel + i][(C - 1) * pixel + j];
+            temp = (int)round((float)temp / quantArr[i][j]);
+            vRLE[i * pixel + j] = temp;
+        }
     }
 
-    finalMatrixCompress[R][C].v = vRLE;
+    // for(i=1;i<=pixel;i++)
+    //     for(j=1;j<=pixel;j++)
+    //         block[i][j]=(int)round((float)block[i][j]/quantArr[i-1][j-1]);
+ 
+    // vector<int> vRLE;
+    // for (i=1;i<=pixel;i++) {
+    //     for (j=1;j<=pixel;j++) {
+    //         vRLE.push_back(block[i][j]);
+    //     }
+    // }
+
+//     for(i=1;i<=pixel;i++)
+//     for(j=1;j<=pixel;j++)
+//         block[i][j]=globalDCT[(R-1)*pixel+i-1][(C-1)*pixel+j-1];
+ 
+
+//  for(i=1;i<=pixel;i++)
+//    for(j=1;j<=pixel;j++)
+//       block[i][j]=(int)round((float)block[i][j]/quantArr[i-1][j-1]);
+ 
+//  vector<int> vRLE;
+//  for(i=1;i<=pixel;i++){
+//   for(j=1;j<=pixel;j++){
+//      vRLE.push_back(block[i][j]);
+//   }
+//  }
+    finalMatrixCompress[R][C].v=vRLE;
     return;
 }
- 
+
+
 void quantize(int n,int m) {
- int i, j;
-
-// TODO: `quantizeBlock` is a critical region. Figure out how to use OMP here.
-// #ifdef OMP
-//     #pragma omp parallel for schedule(runtime)
-// #endif
-    for(i = 1; i <= n / PIXEL; i++){
-#ifdef SIMD
-    #pragma omp simd
-#endif
-// #ifdef OMP
-//     #pragma omp critical
-// #endif
-    for (j = 1; j <= m / PIXEL; j++) {
-        quantizeBlock(i, j);
-    }
-    }
-
-    return;
+  int i,j;
+ // #pragma omp parallel for schedule(runtime)
+ for(i=1;i<=n/pixel;i++){
+  for(j=1;j<=m/pixel;j++){
+     quantizeBlock(i,j);
+   // encodedData[i][j]=quantizeBlock(i,j);
+  }
+ }
+ return ;
 }
 
 

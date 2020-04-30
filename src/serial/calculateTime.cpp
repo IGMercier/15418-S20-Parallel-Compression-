@@ -7,13 +7,14 @@ using namespace std;
 
 int main(int argc, char **argv) 
 {
+
     FILE *fp;
-    fp = fopen("./info.txt", "r");
-    float ans = 0.0f, temp;
-    while (fscanf(fp,"%f ", &temp) == 1) {
-        ans += temp;
+    fp=fopen("./info.txt","r");
+    float ans=0.0f,temp;
+    while(fscanf(fp,"%f ",&temp)==1){
+    ans+=temp;
     }
-    cout << ans << endl;
+    cout<<ans<<endl;
     fclose(fp);
-    return 0;
+return 0;
 }

@@ -58,7 +58,7 @@ _deps
 *.app
 
 # Images
-# *.jpg
+*.jpg
 *.png
 
 # Text files
