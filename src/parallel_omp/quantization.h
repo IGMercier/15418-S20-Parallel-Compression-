@@ -22,8 +22,9 @@ int quantArr[8][8]={{16,11,12,14,12,10,16,14},
       {121,112,100,120,92,101,103,99}
 };
 
-float globalDCT[3005][3005];
-// vector<vector<float>> globalDCT(3005, vector<float>(3005));
+// NOTE: Using a vector representation gives a minor speedup.
+// float globalDCT[3005][3005];
+vector<vector<float>> globalDCT(3005, vector<float>(3005));
 
 struct INF_COMPRESS {
     vector<int> v;
@@ -46,19 +47,12 @@ void quantizeBlock(int R, int C) {
     }
     }
 
-    // vector<int> vRLE(PIXEL * PIXEL);
+    vector<int> vRLE(PIXEL * PIXEL);
     for (i = 1; i <= pixel; i++) {
     for (j = 1; j <= pixel; j++) {
         // #pragma omp atomic
         block[i][j] = (int)round((float)block[i][j] / quantArr[i-1][j-1]);
-        // vRLE[(i - 1) * PIXEL + (j - 1)] = block[i][j];
-    }
-    }
-
-    vector<int> vRLE;
-    for (i = 1; i <= pixel; i++) {
-    for (j = 1; j <= pixel; j++) {
-        vRLE.push_back(block[i][j]);
+        vRLE[(i - 1) * PIXEL + (j - 1)] = block[i][j];
     }
     }
 
