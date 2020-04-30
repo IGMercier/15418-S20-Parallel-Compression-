@@ -2,7 +2,6 @@
 #include<vector>
 #include<algorithm>
 #include<cmath>
-#include<omp.h>
 #define pixel 8
 using namespace std;
 

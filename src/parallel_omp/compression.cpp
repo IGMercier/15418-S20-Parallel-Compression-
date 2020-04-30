@@ -6,6 +6,8 @@
 #include <chrono>
 #include <fstream>
 #include <string>
+#include<omp.h>
+
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -14,8 +16,9 @@
 #include "../../include/stb_image_write.h"
 #include "dequantization.h"
 
-// #define SERIAL
+// setenv OMP_STACKSIZE 8M
 
+// #define SERIAL
 #ifndef SERIAL
 #define OMP
 #endif
@@ -41,6 +44,7 @@ inline int getOffset(int width, int i, int j) {
     return (i * width + j) * 3;
 }
 
+
 void print_mat(float **m, int N, int M){
 
    for(int i = 0; i < N; i++)
@@ -54,16 +58,17 @@ void print_mat(float **m, int N, int M){
    cout<<endl;
 }
 
+
 void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m)
 {
   float **smallMatrix = calloc_mat(dimX, dimY);
   float **DCTMatrix = calloc_mat(dimX, dimY);
-  float **newMatrix = calloc_mat(dimX, dimY);
 
+// #ifndef SERIAL
 // #ifdef OMP
 //   #pragma omp parallel for schedule (runtime)
 // #endif
-    // NOTE: CHECK THIS.
+// #endif
     for (int i = 0; i < n; i += dimX) {
         for (int j = 0; j < m; j += dimY) {
             for (int k = i; k < i + pixel && k < n; k++) {
@@ -76,39 +81,68 @@ void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m)
 
             for (int k = i; k < i + pixel && k < n ;k++) {
                 for (int l=j; l<j+pixel && l<m ;l++) {
-                    globalDCT[k][l]=DCTMatrix[k-i][l-j];
+                    globalDCT[k][l] = DCTMatrix[k-i][l-j];
                 }
-            } 
+            }
         }
     }
+
+    // TODO: I think the memory is not being freed properly for double pointers
     delete[] smallMatrix;
     delete[] DCTMatrix;
 }
 
 
-void dct(float **DCTMatrix, float **Matrix, int N, int M){
+void dct(float **DCTMatrix, float **Matrix, int N, int M) {
     int i, j, u, v;
+    // for all pixels in the 8 x 8 block
 // #ifdef OMP
 //     #pragma omp parallel for schedule(runtime)
+// cout << getenv(OMP_STACKSIZE) << endl;
 // #endif
-    // NOTE: CHECK THIS.
+// #pragma omp parallel
+{
+    float cos1, cos2, temp;
+    // NOTE: assume that N and M are same.
+    float term1 = M_PI / (float)N;
+    float term2 = M_PI / (float)M;
+    float one_by_root_2 = 1.0 / sqrt(2);
+    float one_by_root_2N = 1.0 / sqrt(2 * N);
+    // #pragma omp for schedule(runtime)
     for (u = 0; u < N; ++u) {
         for (v = 0; v < M; ++v) {
-            DCTMatrix[u][v] = 0;
+            temp = 0;
             for (i = 0; i < N; i++) {
                 for (j = 0; j < M; j++) {
-                    
-                    DCTMatrix[u][v] += Matrix[i][j] * cos(M_PI / ((float)N) * (i + 1. / 2.) * u) * cos(M_PI/((float)M)*(j+1./2.)*v);
+                    cos1 = cos(term1 * (i + 0.5) * u);
+                    cos2 = cos(term2 * (j + 0.5) * v);
+                    // #pragma omp critical
+                    // {
+                    //     // cout << Matrix[i][j] << endl;
+                    temp += Matrix[i][j] * cos1 * cos2;
+                    // }
                 }
             }
 
-            // DCTMatrix[u][v] = 0;
+            temp *= one_by_root_2N;
+            if (u > 0) {
+                temp *= one_by_root_2;
+            }
+
+            if (v > 0) {
+                temp *= one_by_root_2;
+            }
+
+            // TODO: Should be round the value?
+            DCTMatrix[u][v] = temp;
         }
     }
 }
 
+}
 
-void compress(uint8_t *img, int num, int width, int height) {
+
+void compress(pixel_t *img, int num, int width, int height) {
     n = height;
     m = width;
 
@@ -169,8 +203,8 @@ void compress(uint8_t *img, int num, int width, int height) {
       {
         for(int j = 0; j < m; j++)    
         {
-          uint8_t pixelValue = finalMatrixDecompress[i][j];
-          uint8_t *bgrPixel = img + getOffset(width, i, j);
+          pixel_t pixelValue = finalMatrixDecompress[i][j];
+          pixel_t *bgrPixel = img + getOffset(width, i, j);
           bgrPixel[0] = pixelValue;
           bgrPixel[1] = pixelValue;
           bgrPixel[2] = pixelValue;
@@ -223,7 +257,7 @@ int main(int argc, char **argv) {
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff_parallel = end - start;
 
-    stbi_write_jpg("sample.jpg", width, height, bpp, img, width * bpp);
+    stbi_write_jpg("sample_par.jpg", width, height, bpp, img, width * bpp);
 #ifdef VERIFY
 
 #ifndef SERIAL
@@ -243,7 +277,7 @@ int main(int argc, char **argv) {
     }
 
     cout << " Serial -> " << diff_serial.count();
-    stbi_write_jpg("sample_expected.jpg", _width, _height, _bpp, _img, _width * _bpp);
+    stbi_write_jpg("sample_ser.jpg", _width, _height, _bpp, _img, _width * _bpp);
     stbi_image_free(_img);
 
 #endif
