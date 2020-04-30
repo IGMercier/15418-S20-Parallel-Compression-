@@ -6,8 +6,7 @@
 #include <chrono>
 #include <fstream>
 #include <string>
-#include<omp.h>
-
+#include <omp.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -16,16 +15,12 @@
 #include "../../include/stb_image_write.h"
 #include "dequantization.h"
 
-// setenv OMP_STACKSIZE 8M
-
-// #define SERIAL
-#ifndef SERIAL
+#define SERIAL 0
+#if !SERIAL
 #define OMP
 #endif
 
-#define VERIFY
-
-#define numThreads 8
+#define NUM_THREADS 8
 #define NUM_CHANNELS 3
 
 using namespace std;
@@ -46,7 +41,6 @@ inline int getOffset(int width, int i, int j) {
 
 
 void print_mat(float **m, int N, int M){
-
    for(int i = 0; i < N; i++)
    {
     for(int j = 0; j < M; j++)
@@ -59,18 +53,20 @@ void print_mat(float **m, int N, int M){
 }
 
 
-void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m)
-{
-  float **smallMatrix = calloc_mat(dimX, dimY);
-  float **DCTMatrix = calloc_mat(dimX, dimY);
+void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
+    float **smallMatrix = calloc_mat(dimX, dimY);
+    float **DCTMatrix = calloc_mat(dimX, dimY);
 
-// #ifndef SERIAL
-// #ifdef OMP
-//   #pragma omp parallel for schedule (runtime)
-// #endif
-// #endif
+#if !SERIAL
+
+#endif
     for (int i = 0; i < n; i += dimX) {
         for (int j = 0; j < m; j += dimY) {
+#if !SERIAL
+#ifdef OMP
+            // #pragma omp parallel for
+#endif
+#endif
             for (int k = i; k < i + pixel && k < n; k++) {
                 for (int l = j; l < j + pixel && l < m; l++) {
                     smallMatrix[k-i][l-j] = grayContent[k][l];
@@ -101,6 +97,12 @@ void dct(float **DCTMatrix, float **Matrix, int N, int M) {
 // cout << getenv(OMP_STACKSIZE) << endl;
 // #endif
 // #pragma omp parallel
+
+// #if !SERIAL
+// #ifdef OMP
+// #pragma omp parallel
+// #endif
+// #endif
 {
     float cos1, cos2, temp;
     // NOTE: assume that N and M are same.
@@ -108,19 +110,19 @@ void dct(float **DCTMatrix, float **Matrix, int N, int M) {
     float term2 = M_PI / (float)M;
     float one_by_root_2 = 1.0 / sqrt(2);
     float one_by_root_2N = 1.0 / sqrt(2 * N);
-    // #pragma omp for schedule(runtime)
+
+// #if !SERIAL
+// #ifdef OMP
+//     #pragma omp for
+// #endif
+// #endif
     for (u = 0; u < N; ++u) {
         for (v = 0; v < M; ++v) {
-            temp = 0;
             for (i = 0; i < N; i++) {
                 for (j = 0; j < M; j++) {
                     cos1 = cos(term1 * (i + 0.5) * u);
                     cos2 = cos(term2 * (j + 0.5) * v);
-                    // #pragma omp critical
-                    // {
-                    //     // cout << Matrix[i][j] << endl;
                     temp += Matrix[i][j] * cos1 * cos2;
-                    // }
                 }
             }
 
@@ -151,7 +153,7 @@ void compress(pixel_t *img, int num, int width, int height) {
     float **grayContent = calloc_mat(n + add_rows, m + add_columns);
     int dimX = pixel, dimY = pixel;
 
-#ifndef SERIAL
+#if !SERIAL
 #ifdef OMP
     #pragma omp parallel for schedule(runtime)
 #endif
@@ -164,7 +166,7 @@ void compress(pixel_t *img, int num, int width, int height) {
     }
 
     // setting extra rows to 0
-#ifndef SERIAL
+#if !SERIAL
 #ifdef OMP
     #pragma omp parallel for schedule(runtime)
 #endif
@@ -176,7 +178,7 @@ void compress(pixel_t *img, int num, int width, int height) {
     }
 
     // setting extra columns to 0
-#ifndef SERIAL
+#if !SERIAL
 #ifdef OMP
     #pragma omp parallel for schedule(runtime)
 #endif
@@ -194,13 +196,12 @@ void compress(pixel_t *img, int num, int width, int height) {
     quantize(n,m);
     dequantize(n,m);
 
-#ifndef SERIAL
+#if !SERIAL
 #ifdef OMP
     #pragma omp parallel for schedule(runtime)
 #endif
 #endif
-    for (int i = 0; i < n; i++)
-      {
+    for (int i = 0; i < n; i++) {
         for(int j = 0; j < m; j++)    
         {
           pixel_t pixelValue = finalMatrixDecompress[i][j];
@@ -231,7 +232,7 @@ bool imagesAreIdentical(pixel_t *img1, pixel_t *img2, int width, int height, int
 int main(int argc, char **argv) {
     FILE *fp;
     fp=fopen("./info.txt","a+"); 
-    omp_set_num_threads(numThreads);
+    omp_set_num_threads(NUM_THREADS);
     string str="../../images/";
     string ext=".jpg";
 
@@ -244,11 +245,6 @@ int main(int argc, char **argv) {
 #ifdef SIMD
     cout << "SIMD, ";
 #endif
-#ifdef SERIAL
-    cout << "Serial -> ";
-#else
-    cout << "Parallel -> ";
-#endif
 
     auto start = chrono::high_resolution_clock::now();
     int width, height, bpp;
@@ -257,32 +253,19 @@ int main(int argc, char **argv) {
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff_parallel = end - start;
 
+#if SERIAL
+    stbi_write_jpg("sample_ser.jpg", width, height, bpp, img, width * bpp);
+#else
     stbi_write_jpg("sample_par.jpg", width, height, bpp, img, width * bpp);
-#ifdef VERIFY
-
-#ifndef SERIAL
-#define SERIAL
-#endif
-    start = chrono::high_resolution_clock::now();
-    int _width, _height, _bpp;
-    pixel_t *_img = stbi_load(path.data(), &_width, &_height, &_bpp, NUM_CHANNELS);
-    compress(_img, 0, _width, _height);
-    end = chrono::high_resolution_clock::now();
-    std::chrono::duration<double> diff_serial = end - start;
-    
-    if (imagesAreIdentical(img, _img, width, height, bpp)) {
-        cout << "CORRECT!, ";
-    } else {
-        cout << "INCORRECT!, ";
-    }
-
-    cout << " Serial -> " << diff_serial.count();
-    stbi_write_jpg("sample_ser.jpg", _width, _height, _bpp, _img, _width * _bpp);
-    stbi_image_free(_img);
-
 #endif
     stbi_image_free(img);
-    cout << ", Parallel -> " << diff_parallel.count() << endl;
+
+#if SERIAL
+    cout << "Serial -> ";
+#else
+    cout << "Parallel -> ";
+#endif   
+    cout << diff_parallel.count() << endl;
 
     fprintf(fp,"%f ",(float)diff_parallel.count());
     fclose(fp);

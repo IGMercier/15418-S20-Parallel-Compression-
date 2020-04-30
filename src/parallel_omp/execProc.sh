@@ -7,5 +7,5 @@ do
   ./a.out "$a"
   a=`expr $a + 1`
 done
-g++ calculateTime.cpp
+g++ compare.cpp -std=c++11
 ./a.out
