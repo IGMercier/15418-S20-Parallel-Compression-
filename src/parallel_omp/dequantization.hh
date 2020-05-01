@@ -1,9 +1,7 @@
 #ifndef DEQUANTIZATION_HH
 #define DEQUANTIZATION_HH
 
-#include <iostream>
 #include <vector>
-#include <algorithm>
 #include <cmath>
 
 #include "../../include/config.hh"

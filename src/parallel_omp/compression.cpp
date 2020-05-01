@@ -1,6 +1,4 @@
-#include <cstdlib>
 #include <iostream>
-#include <stdio.h>
 #include <cmath>
 #include <chrono>
 #include <fstream>
