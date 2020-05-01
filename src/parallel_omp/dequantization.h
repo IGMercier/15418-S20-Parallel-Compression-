@@ -1,22 +1,23 @@
-#include<iostream>
-#include<vector>
-#include<algorithm>
-#include<cmath>
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <cmath>
 #include "quantization.h"
 
 using namespace std;
 
+
+// prototypes
 void idct(float **Matrix, float **DCTMatrix, int N, int M);
 float **calloc_mat(int dimX, int dimY);
 
-float **calloc_mat(int dimX, int dimY)
-{
+
+float **calloc_mat(int dimX, int dimY) {
     float **m = (float**) calloc(dimX, sizeof(float*));
     float *p = (float *) calloc(dimX*dimY, sizeof(float));
     int i;
 
-    for(i=0; i <dimX;i++)
-    {
+    for (i=0; i <dimX;i++) {
         m[i] = &p[i*dimY];
     }
 
@@ -28,67 +29,75 @@ void free_mat(float **m){
   free(m);
 }
 
-void idct(float **Matrix, float **DCTMatrix, int N, int M){
+
+void idct(float **Matrix, float **DCTMatrix, int N, int M) {
     int i, j, u, v;
-    // #pragma omp parallel for schedule(runtime)
+    float cos1, cos2, temp;
+    // Useful constants.
+    float term1 = M_PI / (float)N;
+    float term2 = M_PI / (float)M;
+    float one_by_root_2 = 1.0 / sqrt(2);
+    float one_by_root_2N = 1.0 / sqrt(2 * N);
+
     for (u = 0; u < N; ++u) {
         for (v = 0; v < M; ++v) {
-          Matrix[u][v] = 1/4.*DCTMatrix[0][0];
-          for(i = 1; i < N; i++){
-          Matrix[u][v] += 1/2.*DCTMatrix[i][0];
-           }
-           for(j = 1; j < M; j++){
-          Matrix[u][v] += 1/2.*DCTMatrix[0][j];
-           }
+            Matrix[u][v] = 1/4. * DCTMatrix[0][0];
+            for (i = 1; i < N; i++) {
+                Matrix[u][v] += 1/2. * DCTMatrix[i][0];
+            }
 
-           for (i = 1; i < N; i++) {
+            for (j = 1; j < M; j++) {
+                Matrix[u][v] += 1/2. * DCTMatrix[0][j];
+            }
+
+            for (i = 1; i < N; i++) {
                 for (j = 1; j < M; j++) {
-                    Matrix[u][v] += DCTMatrix[i][j] * cos(M_PI/((float)N)*(u+1./2.)*i)*cos(M_PI/((float)M)*(v+1./2.)*j);
+                    // cos1 = cos(term1 * (u + 1./2.) * i);
+                    // cos2 = cos(term2 * (v + 1./2.) * j);
+                    cos1 = cos(term1 * (i + 1./2.) * u);
+                    cos2 = cos(term2 * (j + 1./2.) * v);
+                    Matrix[u][v] += DCTMatrix[i][j] * cos1 * cos2;
                 }
             }
-        Matrix[u][v] *= 2./((float)N)*2./((float)M);
+
+            Matrix[u][v] *= 2./((float)N)*2./((float)M);
         }
     }
-    //print_mat(Matrix, pixel, pixel);
- }
+}
 
-void dequantizeBlock(int R,int C)
-{
-  int block[9][9],i,j;
-  float **finalBlock = calloc_mat(pixel, pixel);
-  float **newBlock = calloc_mat(pixel, pixel);
-  //reading fromm the compressed vector 
-  for(i=1;i<=pixel;i++){
-    for(j=1;j<=pixel;j++){
-      block[i][j]=finalMatrixCompress[R][C].v[(i-1)*pixel+j-1];
-    }
-  }
-  //dequantization part
-  
-  for(i=1;i<=pixel;i++){
-    for(j=1;j<=pixel;j++){
-        newBlock[i-1][j-1]=(float)block[i][j]*quantArr[i-1][j-1];
-    }
-  }
 
-  idct(finalBlock,newBlock,pixel,pixel);
-  
-  for(i=0;i<pixel;i++){
-    for(j=0;j<pixel;j++){
-      finalMatrixDecompress[(R-1)*pixel+i][(C-1)*pixel+j]=finalBlock[i][j];
+void dequantizeBlock(int R,int C) {
+    int temp, i, j;
+    float **finalBlock = calloc_mat(WINDOW, WINDOW);
+    float **newBlock = calloc_mat(pixel, pixel);
+    for (i = 0; i < WINDOW; i++) {
+        for (j = 0; j < WINDOW; j++) {
+            // read quantized value from compressed vector
+            temp = finalMatrixCompress[R][C].v[i * WINDOW + j];
+            // dequantize value using `quantArr`
+            newBlock[i][j] = (float)temp * quantArr[i][j];
+        }
     }
-  }
-  return ;
+
+    idct(finalBlock, newBlock, WINDOW, WINDOW);
+
+    for (i = 0; i < WINDOW; i++) {
+        for (j = 0; j < WINDOW; j++) {
+            finalMatrixDecompress[R * WINDOW + i][C * WINDOW + j] = finalBlock[i][j];
+        }
+    }
+    return;
 }
 
 
 void dequantize(int n,int m) {
-    int i,j;
-    // NOTE: Check this.
-    for(i=1;i<=n/pixel;i++){
-    for(j=1;j<=m/pixel;j++){
-        dequantizeBlock(i,j);
+    int i, j;
+    // #pragma omp parallel for schedule(runtime)
+    for (i=0; i<n/pixel; i++) {
+        for (j=0; j<m/pixel; j++) {
+            dequantizeBlock(i, j);
+        }
     }
-    }
+
     return;
 }
