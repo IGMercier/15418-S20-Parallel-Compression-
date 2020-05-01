@@ -1,10 +1,17 @@
+#ifndef QUANTIZATION_HH
+#define QUANTIZATION_HH
+
 #include <vector>
 #include <cmath>
 #include <iostream>
 #include <algorithm>
 
-#define pixel 8
-#define WINDOW 8
+#include "config.hh"
+
+// #define pixel 8
+// #define WINDOW 8
+// #define WINDOW_X 8
+// #define WINDOW_Y 8
 
 using namespace std;
 
@@ -21,51 +28,39 @@ vector<vector<int>> quantArr = {{16, 11, 12, 14, 12, 10, 16, 14},
 // float globalDCT[3005][3005];
 // vector<vector<float>> globalDCT;
 float **globalDCT{};
-
-struct INF_COMPRESS {
-  vector<int> v;
-} finalMatrixCompress[3000][3000];
-int finalMatrixDecompress[3000][3000];
-
-// vector<vector<vector<int>>> finalMatrixCompress(200, vector<vector<int>>(200, vector<int>(64)));
-// vector<vector<int>> finalMatrixDecompress(1000, vector<int>(1000));
+vector<vector<int>> finalMatrixCompress;
+vector<vector<int>> finalMatrixDecompress;
 
 /** Quantize a block by dividing its pixel value with the respective value
  * in the quantization matrix
  */
 void quantizeBlock(int R, int C) {
-    int i, j;
-    vector<int> vRLE(WINDOW * WINDOW);
-
-    for (i = 0; i < WINDOW; i++) {
-        for (j = 0; j < WINDOW; j++) {
-            int temp = globalDCT[R * WINDOW + i][C * WINDOW + j];
+    int i, j, temp;
+    // vector<int> vRLE(WINDOW_X * WINDOW_Y);
+    for (i = 0; i < WINDOW_X; i++) {
+        for (j = 0; j < WINDOW_Y; j++) {
+            temp = globalDCT[R + i][C + j];
             temp = (int)round((float)temp / quantArr[i][j]);
-            vRLE[i * WINDOW + j] = temp;
+            // vRLE[i * WINDOW_Y + j] = temp;
+            finalMatrixCompress[R + i][C + j] = temp;
         }
     }
 
-    finalMatrixCompress[R + 1][C + 1].v = vRLE;
-    // finalMatrixCompress[R + 1][C + 1] = vRLE;
-    return;
+    // finalMatrixCompress[R][C].v = vRLE;
 }
 
 
 void quantize(int height, int width) {
-    int i, j;
-
 #if !SERIAL
 #ifdef OMP
     #pragma omp parallel for schedule(runtime)
 #endif
 #endif
-    for (i = 0; i < height / WINDOW; i++) {
-        for (j = 0; j < width / WINDOW; j++) {
+    for (int i = 0; i < height; i += WINDOW_X) {
+        for (int j = 0; j < width; j += WINDOW_Y) {
             quantizeBlock(i, j);
         }
     }
-
-    return;
 }
 
-
+#endif
