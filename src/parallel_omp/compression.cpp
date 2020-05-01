@@ -10,7 +10,7 @@
 #include "../../include/config.hh"
 #include "../../include/stb_image.h"
 #include "../../include/stb_image_write.h"
-#include "dequantization.h"
+#include "dequantization.hh"
 
 using namespace std;
 using pixel_t = uint8_t;
@@ -88,7 +88,7 @@ void discreteCosTransform(vector<vector<int>> &grayContent, int offsetX, int off
 }
 
 
-void compress(pixel_t *const img, int num, int width, int height) {
+void compress(pixel_t *const img, int width, int height) {
     n = height;
     m = width;
 
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
     auto start = chrono::high_resolution_clock::now();
     int width, height, bpp;
     pixel_t *const img = stbi_load(path.data(), &width, &height, &bpp, 3);
-    compress(img, 0, width, height);
+    compress(img, width, height);
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff_parallel = end - start;
     cout << "Width: " << width << ", ";

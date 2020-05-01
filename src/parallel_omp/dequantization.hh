@@ -7,7 +7,7 @@
 #include <cmath>
 
 #include "../../include/config.hh"
-#include "quantization.h"
+#include "quantization.hh"
 
 using namespace std;
 
