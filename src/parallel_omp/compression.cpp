@@ -7,30 +7,19 @@
 #include <string>
 #include <omp.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "config.hh"
 
 #include "../../include/stb_image.h"
 #include "../../include/stb_image_write.h"
 #include "dequantization.h"
 
-#define SERIAL 0
-#if !SERIAL
-#define OMP
-#endif
-
-#define NUM_THREADS 8
-#define NUM_CHANNELS 3
-#define TIMER
-
 using namespace std;
-
 using pixel_t = uint8_t;
 
 int n, m;
 
-void dct(float **DCTMatrix, float **Matrix, int N, int M, int, int);
-void write_mat(FILE *fp, float **testRes, int N, int M);
+
+void discreteCosTransform(float **, float **, int, int, int, int);
 void free_mat(float **p);
 void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m);
 
@@ -64,18 +53,18 @@ void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
 #endif
 #endif
     for (int i = 0; i < n; i += dimX) {
-        // cout << "Thread: " << endl;
         for (int j = 0; j < m; j += dimY) {
-            dct(globalDCT, grayContent, dimX, dimY, i, j);
+            discreteCosTransform(globalDCT, grayContent, dimX, dimY, i, j);
         }
     }
 }
 
 
-void dct(float **globalDCT, float **grayMatrix, int N, int M, int offsetX, int offsetY) {
+void discreteCosTransform(float **globalDCT, float **grayImage,
+                              int N, int M, int offsetX, int offsetY) {
     int u, v, x, y;
     float cos1, cos2, temp;
-    // NOTE: assume that N and M are same.
+    // Useful constants.
     float term1 = M_PI / (float)N;
     float term2 = M_PI / (float)M;
     float one_by_root_2 = 1.0 / sqrt(2);
@@ -83,11 +72,12 @@ void dct(float **globalDCT, float **grayMatrix, int N, int M, int offsetX, int o
 
     for (u = 0; u < N; ++u) {
         for (v = 0; v < M; ++v) {
+            temp = 0.0;
             for (x = 0; x < N; x++) {
                 for (y = 0; y < M; y++) {
                     cos1 = cos(term1 * (x + 0.5) * u);
                     cos2 = cos(term2 * (y + 0.5) * v);
-                    temp += grayMatrix[x + offsetX][y + offsetY] * cos1 * cos2;
+                    temp += grayImage[x + offsetX][y + offsetY] * cos1 * cos2;
                 }
             }
 
@@ -111,13 +101,15 @@ void compress(pixel_t *img, int num, int width, int height) {
     n = height;
     m = width;
 
-    int add_rows = (pixel - (n % pixel) != pixel ? pixel - (n % pixel) : 0);
-    int add_columns = (pixel - (m % pixel) != pixel ? pixel - (m % pixel) : 0) ;
+    int add_rows = (PIXEL - (n % PIXEL) != PIXEL ? PIXEL - (n % PIXEL) : 0);
+    int add_columns = (PIXEL - (m % PIXEL) != PIXEL ? PIXEL - (m % PIXEL) : 0) ;
     float **grayContent = calloc_mat(n + add_rows, m + add_columns);
     globalDCT = calloc_mat(n + add_rows, m + add_columns);
     // globalDCT = vector<vector<float>>(n, vector<float>(m));
+    finalMatrixCompress = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns, 0));
+    finalMatrixDecompress = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns, 0));
 
-    int dimX = pixel, dimY = pixel;
+    int dimX = PIXEL, dimY = PIXEL;
 
 #if !SERIAL
 #ifdef OMP
@@ -175,11 +167,18 @@ void compress(pixel_t *img, int num, int width, int height) {
     dequantize(n, m);
     end = chrono::high_resolution_clock::now();
     diff = end - start;
-    cout << "Dequant: " << diff.count()<< ", ";
+    cout << "Dequant: " << diff.count() << ", ";
+
+    start = chrono::high_resolution_clock::now();
+    invDct(n, m);
+    end = chrono::high_resolution_clock::now();
+    diff = end - start;
+    cout << "IDCT: " << diff.count() << ", ";
 #else
     divideMatrix(grayContent, dimX, dimY, n, m);
     quantize(n, m);
     dequantize(n, m);
+    invDct(n, m);
 #endif
 
 #if !SERIAL
