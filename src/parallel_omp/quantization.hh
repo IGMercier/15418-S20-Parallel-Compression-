@@ -22,7 +22,8 @@ vector<vector<int>> quantArr = {{16, 11, 12, 14, 12, 10, 16, 14},
 // vector<vector<int>> finalMatrixCompress;
 // vector<vector<int>> finalMatrixDecompress;
 
-/** Quantize a block by dividing its pixel value with the respective value
+/**
+ * Quantize a block by dividing its pixel value with the respective value
  * in the quantization matrix
  */
 void quantizeBlock(int R, int C) {
