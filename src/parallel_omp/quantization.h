@@ -7,12 +7,6 @@
 #include <algorithm>
 
 #include "config.hh"
-
-// #define pixel 8
-// #define WINDOW 8
-// #define WINDOW_X 8
-// #define WINDOW_Y 8
-
 using namespace std;
 
 vector<vector<int>> quantArr = {{16, 11, 12, 14, 12, 10, 16, 14},
@@ -25,28 +19,22 @@ vector<vector<int>> quantArr = {{16, 11, 12, 14, 12, 10, 16, 14},
                                 {121, 112, 100, 120, 92, 101, 103, 99}
                                 };
 
-// float globalDCT[3005][3005];
 // vector<vector<float>> globalDCT;
-float **globalDCT{};
-vector<vector<int>> finalMatrixCompress;
-vector<vector<int>> finalMatrixDecompress;
+// vector<vector<int>> finalMatrixCompress;
+// vector<vector<int>> finalMatrixDecompress;
 
 /** Quantize a block by dividing its pixel value with the respective value
  * in the quantization matrix
  */
 void quantizeBlock(int R, int C) {
     int i, j, temp;
-    // vector<int> vRLE(WINDOW_X * WINDOW_Y);
     for (i = 0; i < WINDOW_X; i++) {
         for (j = 0; j < WINDOW_Y; j++) {
             temp = globalDCT[R + i][C + j];
             temp = (int)round((float)temp / quantArr[i][j]);
-            // vRLE[i * WINDOW_Y + j] = temp;
             finalMatrixCompress[R + i][C + j] = temp;
         }
     }
-
-    // finalMatrixCompress[R][C].v = vRLE;
 }
 
 

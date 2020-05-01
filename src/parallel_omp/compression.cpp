@@ -8,7 +8,6 @@
 #include <omp.h>
 
 #include "config.hh"
-
 #include "../../include/stb_image.h"
 #include "../../include/stb_image_write.h"
 #include "dequantization.h"
@@ -16,12 +15,12 @@
 using namespace std;
 using pixel_t = uint8_t;
 
+
 int n, m;
 
-
-void discreteCosTransform(float **, float **, int, int, int, int);
-void free_mat(float **p);
-void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m);
+void discreteCosTransform(vector<vector<int>> &, int, int);
+void free_mat(float **);
+void divideMatrix(vector<vector<int>> &, int, int);
 
 
 inline int getOffset(int width, int i, int j) {
@@ -29,55 +28,43 @@ inline int getOffset(int width, int i, int j) {
 }
 
 
-void print_mat(float **m, int N, int M){
-   for(int i = 0; i < N; i++)
-   {
-    for(int j = 0; j < M; j++)
-    {
-      cout<<m[i][j]<<" ";
-    }
-    cout<<endl;
-   }
-   cout<<endl;
+template <typename T>
+vector<vector<T>> initializeMatrix(int rows, int cols) {
+    return vector<vector<T>>(rows, vector<T>(cols));
 }
 
 
-void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
-    if (grayContent == nullptr || globalDCT == nullptr) {
-        cout << "Invalid argument" << endl;
-    }
-
+void divideMatrix(vector<vector<int>> &grayContent, int n, int m) {
 #if !SERIAL
 #ifdef OMP
 #pragma omp parallel for schedule(runtime)
 #endif
 #endif
-    for (int i = 0; i < n; i += dimX) {
-        for (int j = 0; j < m; j += dimY) {
-            discreteCosTransform(globalDCT, grayContent, dimX, dimY, i, j);
+    for (int i = 0; i < n; i += WINDOW_X) {
+        for (int j = 0; j < m; j += WINDOW_Y) {
+            discreteCosTransform(grayContent, i, j);
         }
     }
 }
 
 
-void discreteCosTransform(float **globalDCT, float **grayImage,
-                              int N, int M, int offsetX, int offsetY) {
+void discreteCosTransform(vector<vector<int>> &grayContent, int offsetX, int offsetY) {
     int u, v, x, y;
     float cos1, cos2, temp;
     // Useful constants.
-    float term1 = M_PI / (float)N;
-    float term2 = M_PI / (float)M;
+    float term1 = M_PI / (float)WINDOW_X;
+    float term2 = M_PI / (float)WINDOW_Y;
     float one_by_root_2 = 1.0 / sqrt(2);
-    float one_by_root_2N = 1.0 / sqrt(2 * N);
+    float one_by_root_2N = 1.0 / sqrt(2 * WINDOW_X);
 
-    for (u = 0; u < N; ++u) {
-        for (v = 0; v < M; ++v) {
+    for (u = 0; u < WINDOW_X; ++u) {
+        for (v = 0; v < WINDOW_Y; ++v) {
             temp = 0.0;
-            for (x = 0; x < N; x++) {
-                for (y = 0; y < M; y++) {
+            for (x = 0; x < WINDOW_X; x++) {
+                for (y = 0; y < WINDOW_Y; y++) {
                     cos1 = cos(term1 * (x + 0.5) * u);
                     cos2 = cos(term2 * (y + 0.5) * v);
-                    temp += grayImage[x + offsetX][y + offsetY] * cos1 * cos2;
+                    temp += grayContent[x + offsetX][y + offsetY] * cos1 * cos2;
                 }
             }
 
@@ -103,13 +90,17 @@ void compress(pixel_t *img, int num, int width, int height) {
 
     int add_rows = (PIXEL - (n % PIXEL) != PIXEL ? PIXEL - (n % PIXEL) : 0);
     int add_columns = (PIXEL - (m % PIXEL) != PIXEL ? PIXEL - (m % PIXEL) : 0) ;
-    float **grayContent = calloc_mat(n + add_rows, m + add_columns);
-    globalDCT = calloc_mat(n + add_rows, m + add_columns);
-    // globalDCT = vector<vector<float>>(n, vector<float>(m));
-    finalMatrixCompress = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns, 0));
-    finalMatrixDecompress = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns, 0));
 
-    int dimX = PIXEL, dimY = PIXEL;
+    /* Initialize data structures */
+    vector<vector<int>> grayContent = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns));
+    globalDCT = vector<vector<float>>(n + add_rows, vector<float>(m + add_columns));
+    finalMatrixCompress = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns));
+    finalMatrixDecompress = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns));
+
+    // vector<vector<int>> grayContent = initializeMatrix(n + add_rows, m + add_columns);
+    // globalDCT = initializeMatrix(n + add_rows, m + add_columns);
+    // finalMatrixCompress = initializeMatrix(n + add_rows, m + add_columns);
+    // finalMatrixDecompress = initializeMatrix(n + add_rows, m + add_columns);
 
 #if !SERIAL
 #ifdef OMP
@@ -152,7 +143,7 @@ void compress(pixel_t *img, int num, int width, int height) {
 
 #ifdef TIMER // NO_TIMER
     auto start = chrono::high_resolution_clock::now();
-    divideMatrix(grayContent, dimX, dimY, n, m);
+    divideMatrix(grayContent, n, m);
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
     cout << "DCT: " << diff.count() << ", ";
@@ -175,7 +166,7 @@ void compress(pixel_t *img, int num, int width, int height) {
     diff = end - start;
     cout << "IDCT: " << diff.count() << ", ";
 #else
-    divideMatrix(grayContent, dimX, dimY, n, m);
+    divideMatrix(grayContent, n, m);
     quantize(n, m);
     dequantize(n, m);
     invDct(n, m);
@@ -196,7 +187,7 @@ void compress(pixel_t *img, int num, int width, int height) {
         }
     }
 
-    free(grayContent);
+    // free(grayContent);
 }
 
 

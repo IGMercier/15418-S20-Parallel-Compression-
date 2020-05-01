@@ -1,11 +1,12 @@
 #ifndef CONFIG_HH
 #define CONFIG_HH
 
+#include <vector>
+
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #define PIXEL 8
-#define WINDOW 8
 #define WINDOW_X 8
 #define WINDOW_Y 8
 
@@ -14,8 +15,15 @@
 #define OMP
 #endif
 
+#define TIMER
+
 #define NUM_THREADS 8
 #define NUM_CHANNELS 3
-#define TIMER
+
+/* Important data structures */
+std::vector<std::vector<float>> globalDCT;
+std::vector<std::vector<int>> finalMatrixCompress;
+std::vector<std::vector<int>> finalMatrixDecompress;
+
 
 #endif
