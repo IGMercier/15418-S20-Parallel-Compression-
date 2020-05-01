@@ -14,13 +14,14 @@
 #include "../../include/stb_image_write.h"
 #include "dequantization.h"
 
-#define SERIAL 1
+#define SERIAL 0
 #if !SERIAL
 #define OMP
 #endif
 
 #define NUM_THREADS 8
 #define NUM_CHANNELS 3
+#define TIMER
 
 using namespace std;
 
@@ -28,7 +29,7 @@ using pixel_t = uint8_t;
 
 int n, m;
 
-void dct2(float **DCTMatrix, float **Matrix, int N, int M, int, int);
+void dct(float **DCTMatrix, float **Matrix, int N, int M, int, int);
 void write_mat(FILE *fp, float **testRes, int N, int M);
 void free_mat(float **p);
 void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m);
@@ -65,13 +66,13 @@ void divideMatrix(float **grayContent, int dimX, int dimY, int n, int m) {
     for (int i = 0; i < n; i += dimX) {
         // cout << "Thread: " << endl;
         for (int j = 0; j < m; j += dimY) {
-            dct2(globalDCT, grayContent, dimX, dimY, i, j);
+            dct(globalDCT, grayContent, dimX, dimY, i, j);
         }
     }
 }
 
 
-void dct2(float **globalDCT, float **grayMatrix, int N, int M, int offsetX, int offsetY) {
+void dct(float **globalDCT, float **grayMatrix, int N, int M, int offsetX, int offsetY) {
     int u, v, x, y;
     float cos1, cos2, temp;
     // NOTE: assume that N and M are same.
@@ -100,7 +101,6 @@ void dct2(float **globalDCT, float **grayMatrix, int N, int M, int offsetX, int 
             }
 
             // TODO: ensure that u + offset < i + pixel and < n
-            // #pragma omp atomic
             globalDCT[u + offsetX][v + offsetY] = temp;
         }
     }
@@ -131,7 +131,7 @@ void compress(pixel_t *img, int num, int width, int height) {
         }
     }
 
-    // setting extra rows to 0
+    // zero-padding extra rows
 #if !SERIAL
 #ifdef OMP
     #pragma omp parallel for schedule(runtime)
@@ -143,7 +143,7 @@ void compress(pixel_t *img, int num, int width, int height) {
         }
     }
 
-    // setting extra columns to 0
+    // zero-padding extra columns
 #if !SERIAL
 #ifdef OMP
     #pragma omp parallel for schedule(runtime)
@@ -155,12 +155,32 @@ void compress(pixel_t *img, int num, int width, int height) {
         }
     }
 
-    n = add_rows + n;  // making rows as a multiple of 8
-    m = add_columns + m;  // making columns as a multiple of 8
+    n += add_rows;      // making number of rows a multiple of 8
+    m += add_columns;   // making number of cols a multiple of 8
 
+#ifdef TIMER // NO_TIMER
+    auto start = chrono::high_resolution_clock::now();
     divideMatrix(grayContent, dimX, dimY, n, m);
-    quantize(n,m);
-    dequantize(n,m);
+    auto end = chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end - start;
+    cout << "DCT: " << diff.count() << ", ";
+
+    start = chrono::high_resolution_clock::now();
+    quantize(n, m);
+    end = chrono::high_resolution_clock::now();
+    diff = end - start;
+    cout << "Quant: " << diff.count() << ", ";
+
+    start = chrono::high_resolution_clock::now();
+    dequantize(n, m);
+    end = chrono::high_resolution_clock::now();
+    diff = end - start;
+    cout << "Dequant: " << diff.count()<< ", ";
+#else
+    divideMatrix(grayContent, dimX, dimY, n, m);
+    quantize(n, m);
+    dequantize(n, m);
+#endif
 
 #if !SERIAL
 #ifdef OMP
@@ -168,30 +188,16 @@ void compress(pixel_t *img, int num, int width, int height) {
 #endif
 #endif
     for (int i = 0; i < n; i++) {
-        for(int j = 0; j < m; j++)    
-        {
-          pixel_t pixelValue = finalMatrixDecompress[i][j];
-          pixel_t *bgrPixel = img + getOffset(width, i, j);
-          bgrPixel[0] = pixelValue;
-          bgrPixel[1] = pixelValue;
-          bgrPixel[2] = pixelValue;
-        }
-      }
-
-    free(grayContent);
-}
-
-
-bool imagesAreIdentical(pixel_t *img1, pixel_t *img2, int width, int height, int bpp) {
-    long error = 0;
-    int size = height * width * bpp;
-    for (int i = 0; i < size; i++) {
-        if (img1[i] != img2[i]) {
-            error += abs(img1[i] - img2[i]);
+        for(int j = 0; j < m; j++) {
+            pixel_t pixelValue = finalMatrixDecompress[i][j];
+            pixel_t *bgrPixel = img + getOffset(width, i, j);
+            bgrPixel[0] = pixelValue;
+            bgrPixel[1] = pixelValue;
+            bgrPixel[2] = pixelValue;
         }
     }
 
-    return error == 0;
+    free(grayContent);
 }
 
 
