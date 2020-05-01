@@ -1,7 +1,12 @@
+#ifndef DEQUANTIZATION_HH
+#define DEQUANTIZATION_HH
+
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <cmath>
+
+#include "config.hh"
 #include "quantization.h"
 
 using namespace std;
@@ -24,80 +29,84 @@ float **calloc_mat(int dimX, int dimY) {
     return m;
 }
 
+
 void free_mat(float **m){
-  free(m[0]);
-  free(m);
+    free(m[0]);
+    free(m);
 }
 
 
-void idct(float **Matrix, float **DCTMatrix, int N, int M) {
-    int i, j, u, v;
+void invDiscreteCosTransform(int R, int C) {
+    int x, y, u, v;
     float cos1, cos2, temp;
     // Useful constants.
-    float term1 = M_PI / (float)N;
-    float term2 = M_PI / (float)M;
-    float one_by_root_2 = 1.0 / sqrt(2);
-    float one_by_root_2N = 1.0 / sqrt(2 * N);
+    float term1 = M_PI / (float)WINDOW_X;
+    float term2 = M_PI / (float)WINDOW_Y;
+    float term3 = 2. / (float)WINDOW_X;
+    float term4 = 2. / (float)WINDOW_Y;
 
-    for (u = 0; u < N; ++u) {
-        for (v = 0; v < M; ++v) {
-            Matrix[u][v] = 1/4. * DCTMatrix[0][0];
-            for (i = 1; i < N; i++) {
-                Matrix[u][v] += 1/2. * DCTMatrix[i][0];
+    for (u = 0; u < WINDOW_X; ++u) {
+        for (v = 0; v < WINDOW_Y; ++v) {
+            temp = 1/4. * (float)finalMatrixCompress[R + 0][C + 0];
+            for (x = 1; x < WINDOW_X; x++) {
+                temp += 1/2. * (float)finalMatrixCompress[R + x][C + 0];
             }
 
-            for (j = 1; j < M; j++) {
-                Matrix[u][v] += 1/2. * DCTMatrix[0][j];
+            for (y = 1; y < WINDOW_Y; y++) {
+                temp += 1/2. * (float)finalMatrixCompress[R + 0][C + y];
             }
 
-            for (i = 1; i < N; i++) {
-                for (j = 1; j < M; j++) {
-                    // cos1 = cos(term1 * (u + 1./2.) * i);
-                    // cos2 = cos(term2 * (v + 1./2.) * j);
-                    cos1 = cos(term1 * (i + 1./2.) * u);
-                    cos2 = cos(term2 * (j + 1./2.) * v);
-                    Matrix[u][v] += DCTMatrix[i][j] * cos1 * cos2;
+            for (x = 1; x < WINDOW_X; x++) {
+                for (y = 1; y < WINDOW_Y; y++) {
+                    cos1 = cos(term1 * (x + 0.5) * u);
+                    cos2 = cos(term2 * (y + 0.5) * v);
+                    temp += (float)finalMatrixCompress[R + x][C + y] * cos1 * cos2;
                 }
             }
 
-            Matrix[u][v] *= 2./((float)N)*2./((float)M);
+            finalMatrixDecompress[u + R][v + C] = temp * term3 * term4;
         }
     }
 }
 
 
-void dequantizeBlock(int R,int C) {
-    int temp, i, j;
-    float **finalBlock = calloc_mat(WINDOW, WINDOW);
-    float **newBlock = calloc_mat(pixel, pixel);
-    for (i = 0; i < WINDOW; i++) {
-        for (j = 0; j < WINDOW; j++) {
-            // read quantized value from compressed vector
-            temp = finalMatrixCompress[R][C].v[i * WINDOW + j];
-            // dequantize value using `quantArr`
-            newBlock[i][j] = (float)temp * quantArr[i][j];
-        }
-    }
-
-    idct(finalBlock, newBlock, WINDOW, WINDOW);
-
-    for (i = 0; i < WINDOW; i++) {
-        for (j = 0; j < WINDOW; j++) {
-            finalMatrixDecompress[R * WINDOW + i][C * WINDOW + j] = finalBlock[i][j];
-        }
-    }
-    return;
-}
-
-
-void dequantize(int n,int m) {
-    int i, j;
+void invDct(int height, int width) {
     // #pragma omp parallel for schedule(runtime)
-    for (i=0; i<n/pixel; i++) {
-        for (j=0; j<m/pixel; j++) {
+#if !SERIAL
+#ifdef OMP
+    #pragma omp parallel for schedule(runtime)
+#endif
+#endif
+    for (int i = 0; i < height; i += WINDOW_X) {
+        for (int j = 0; j < width; j += WINDOW_Y) {
+            invDiscreteCosTransform(i, j);
+        }
+    }
+}
+
+
+void dequantizeBlock(int R, int C) {
+    int i, j;
+    for (i = 0; i < WINDOW_X; i++) {
+        for (j = 0; j < WINDOW_Y; j++) {
+            // read and dequantize the quantized value from compressed vector
+            finalMatrixCompress[R + i][C + j] *= quantArr[i][j];
+        }
+    }
+}
+
+
+void dequantize(int height, int width) {
+#if !SERIAL
+#ifdef OMP
+    #pragma omp parallel for schedule(runtime)
+#endif
+#endif
+    for (int i = 0; i < height; i += WINDOW_X) {
+        for (int j = 0; j < width; j += WINDOW_Y) {
             dequantizeBlock(i, j);
         }
     }
-
-    return;
 }
+
+#endif
