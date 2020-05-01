@@ -71,7 +71,6 @@ void invDiscreteCosTransform(int R, int C) {
 
 
 void invDct(int height, int width) {
-    // #pragma omp parallel for schedule(runtime)
 #if !SERIAL
 #ifdef OMP
     #pragma omp parallel for schedule(runtime)

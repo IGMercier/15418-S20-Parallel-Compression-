@@ -28,9 +28,13 @@ inline int getOffset(int width, int i, int j) {
 }
 
 
-template <typename T>
-vector<vector<T>> initializeMatrix(int rows, int cols) {
-    return vector<vector<T>>(rows, vector<T>(cols));
+vector<vector<int>> initializeIntMatrix(int rows, int cols) {
+    return vector<vector<int>>(rows, vector<int>(cols));
+}
+
+
+vector<vector<float>> initializeFloatMatrix(int rows, int cols) {
+    return vector<vector<float>>(rows, vector<float>(cols));
 }
 
 
@@ -84,23 +88,22 @@ void discreteCosTransform(vector<vector<int>> &grayContent, int offsetX, int off
 }
 
 
-void compress(pixel_t *img, int num, int width, int height) {
+void compress(pixel_t *const img, int num, int width, int height) {
     n = height;
     m = width;
 
     int add_rows = (PIXEL - (n % PIXEL) != PIXEL ? PIXEL - (n % PIXEL) : 0);
     int add_columns = (PIXEL - (m % PIXEL) != PIXEL ? PIXEL - (m % PIXEL) : 0) ;
 
-    /* Initialize data structures */
-    vector<vector<int>> grayContent = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns));
-    globalDCT = vector<vector<float>>(n + add_rows, vector<float>(m + add_columns));
-    finalMatrixCompress = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns));
-    finalMatrixDecompress = vector<vector<int>>(n + add_rows, vector<int>(m + add_columns));
+    // padded dimensions to make multiples of patch size
+    int _height = n + add_rows;
+    int _width = m + add_columns;
 
-    // vector<vector<int>> grayContent = initializeMatrix(n + add_rows, m + add_columns);
-    // globalDCT = initializeMatrix(n + add_rows, m + add_columns);
-    // finalMatrixCompress = initializeMatrix(n + add_rows, m + add_columns);
-    // finalMatrixDecompress = initializeMatrix(n + add_rows, m + add_columns);
+    // Initialize data structures
+    vector<vector<int>> grayContent = initializeIntMatrix(_height, _width);
+    globalDCT = initializeFloatMatrix(_height, _width);
+    finalMatrixCompress = initializeIntMatrix(_height, _width);
+    finalMatrixDecompress = initializeIntMatrix(_height, _width);
 
 #if !SERIAL
 #ifdef OMP
@@ -138,8 +141,8 @@ void compress(pixel_t *img, int num, int width, int height) {
         }
     }
 
-    n += add_rows;      // making number of rows a multiple of 8
-    m += add_columns;   // making number of cols a multiple of 8
+    n = _height;      // making number of rows a multiple of 8
+    m = _width;   // making number of cols a multiple of 8
 
 #ifdef TIMER // NO_TIMER
     auto start = chrono::high_resolution_clock::now();
@@ -213,7 +216,7 @@ int main(int argc, char **argv) {
 
     auto start = chrono::high_resolution_clock::now();
     int width, height, bpp;
-    uint8_t *img = stbi_load(path.data(), &width, &height, &bpp, 3);
+    pixel_t *const img = stbi_load(path.data(), &width, &height, &bpp, 3);
     compress(img, 0, width, height);
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff_parallel = end - start;
