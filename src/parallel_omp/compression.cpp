@@ -7,7 +7,7 @@
 #include <string>
 #include <omp.h>
 
-#include "config.hh"
+#include "../../include/config.hh"
 #include "../../include/stb_image.h"
 #include "../../include/stb_image_write.h"
 #include "dequantization.h"

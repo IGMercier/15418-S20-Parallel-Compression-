@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "config.hh"
+#include "../../include/config.hh"
 #include "quantization.h"
 
 using namespace std;

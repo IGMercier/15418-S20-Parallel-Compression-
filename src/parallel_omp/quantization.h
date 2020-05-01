@@ -6,7 +6,7 @@
 #include <iostream>
 #include <algorithm>
 
-#include "config.hh"
+#include "../../include/config.hh"
 using namespace std;
 
 vector<vector<int>> quantArr = {{16, 11, 12, 14, 12, 10, 16, 14},
