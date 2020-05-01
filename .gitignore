@@ -67,5 +67,5 @@ _deps
 # Directories
 images/
 # JPEG_4_parallel/
-parallel_omp_old/
-serial_old/
+src/parallel_omp_old/
+src/serial_old/
