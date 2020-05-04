@@ -14,7 +14,7 @@
 #define OMP
 #endif
 
-#define TIMER
+// #define TIMER
 
 #define NUM_THREADS 8
 #define NUM_CHANNELS 3
