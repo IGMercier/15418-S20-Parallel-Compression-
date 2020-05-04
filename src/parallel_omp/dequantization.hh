@@ -1,5 +1,4 @@
-#ifndef DEQUANTIZATION_HH
-#define DEQUANTIZATION_HH
+#pragma once
 
 #include <vector>
 #include <cmath>
@@ -105,5 +104,3 @@ void dequantize(int height, int width) {
         }
     }
 }
-
-#endif

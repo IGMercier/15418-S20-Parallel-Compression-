@@ -1,5 +1,4 @@
-#ifndef QUANTIZATION_HH
-#define QUANTIZATION_HH
+#pragma once
 
 #include <vector>
 #include <cmath>
@@ -17,10 +16,6 @@ vector<vector<int>> quantArr = {{16, 11, 12, 14, 12, 10, 16, 14},
                                 {95, 98, 103, 104, 103, 62, 77, 113},
                                 {121, 112, 100, 120, 92, 101, 103, 99}
                                 };
-
-// vector<vector<float>> globalDCT;
-// vector<vector<int>> finalMatrixCompress;
-// vector<vector<int>> finalMatrixDecompress;
 
 /**
  * Quantize a block by dividing its pixel value with the respective value
@@ -50,5 +45,3 @@ void quantize(int height, int width) {
         }
     }
 }
-
-#endif

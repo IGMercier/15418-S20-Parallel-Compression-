@@ -1,5 +1,4 @@
-#ifndef CONFIG_HH
-#define CONFIG_HH
+#pragma once
 
 #include <vector>
 
@@ -24,6 +23,3 @@
 std::vector<std::vector<float>> globalDCT;
 std::vector<std::vector<int>> finalMatrixCompress;
 std::vector<std::vector<int>> finalMatrixDecompress;
-
-
-#endif
