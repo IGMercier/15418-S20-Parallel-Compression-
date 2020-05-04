@@ -43,4 +43,4 @@ int *finalMatrixCompress;
 int *finalMatrixDecompress;
 
 // CUDA functions
-void cudaSetup();
+// void cudaSetup();
