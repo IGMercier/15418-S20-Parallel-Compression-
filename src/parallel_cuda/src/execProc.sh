@@ -8,5 +8,3 @@ do
   ./compressor "$a"
   a=`expr $a + 1`
 done
-# g++ compare.cpp -std=c++11
-# ./a.out
