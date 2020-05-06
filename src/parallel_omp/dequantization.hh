@@ -9,30 +9,6 @@
 using namespace std;
 
 
-// prototypes
-void idct(float **Matrix, float **DCTMatrix, int N, int M);
-float **calloc_mat(int dimX, int dimY);
-
-
-float **calloc_mat(int dimX, int dimY) {
-    float **m = (float**) calloc(dimX, sizeof(float*));
-    float *p = (float *) calloc(dimX*dimY, sizeof(float));
-    int i;
-
-    for (i=0; i <dimX;i++) {
-        m[i] = &p[i*dimY];
-    }
-
-    return m;
-}
-
-
-void free_mat(float **m){
-    free(m[0]);
-    free(m);
-}
-
-
 void invDiscreteCosTransform(int R, int C) {
     int x, y, u, v;
     float cos1, cos2, temp;
@@ -48,11 +24,9 @@ void invDiscreteCosTransform(int R, int C) {
             for (x = 1; x < WINDOW_X; x++) {
                 temp += 1/2. * (float)finalMatrixCompress[R + x][C + 0];
             }
-
             for (y = 1; y < WINDOW_Y; y++) {
                 temp += 1/2. * (float)finalMatrixCompress[R + 0][C + y];
             }
-
             for (x = 1; x < WINDOW_X; x++) {
                 for (y = 1; y < WINDOW_Y; y++) {
                     cos1 = cos(term1 * (x + 0.5) * u);
