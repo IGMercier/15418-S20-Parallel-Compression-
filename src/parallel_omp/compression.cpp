@@ -16,6 +16,8 @@ using pixel_t = uint8_t;
 
 
 int n, m;
+// vector<vector<float>> cosArr1;
+// vector<vector<float>> cosArr2;
 
 void discreteCosTransform(vector<vector<int>> &, int, int);
 void free_mat(float **);
@@ -54,19 +56,14 @@ void divideMatrix(vector<vector<int>> &grayContent, int n, int m) {
 void discreteCosTransform(vector<vector<int>> &grayContent, int offsetX, int offsetY) {
     int u, v, x, y;
     float cos1, cos2, temp;
-    // Useful constants.
-    float term1 = M_PI / (float)WINDOW_X;
-    float term2 = M_PI / (float)WINDOW_Y;
-    float one_by_root_2 = 1.0 / sqrt(2);
-    float one_by_root_2N = 1.0 / sqrt(2 * WINDOW_X);
 
     for (u = 0; u < WINDOW_X; ++u) {
         for (v = 0; v < WINDOW_Y; ++v) {
             temp = 0.0;
             for (x = 0; x < WINDOW_X; x++) {
                 for (y = 0; y < WINDOW_Y; y++) {
-                    cos1 = cos(term1 * (x + 0.5) * u);
-                    cos2 = cos(term2 * (y + 0.5) * v);
+                    cos1 = cosArr1[x][u];
+                    cos2 = cosArr2[y][v];
                     temp += grayContent[x + offsetX][y + offsetY] * cos1 * cos2;
                 }
             }
@@ -95,16 +92,8 @@ void compress(pixel_t *const img, int width, int height, vector<vector<int>> &gr
     int add_columns = (PIXEL - (m % PIXEL) != PIXEL ? PIXEL - (m % PIXEL) : 0) ;
 
     // // padded dimensions to make multiples of patch size
-    // int _height = n + add_rows;
-    // int _width = m + add_columns;
     int _height = grayContent.size();
     int _width = grayContent[0].size();
-
-    // Initialize data structures
-    // vector<vector<int>> grayContent = initializeIntMatrix(_height, _width);
-    // globalDCT = initializeFloatMatrix(_height, _width);
-    // finalMatrixCompress = initializeIntMatrix(_height, _width);
-    // finalMatrixDecompress = initializeIntMatrix(_height, _width);
 
 #if !SERIAL
 #ifdef OMP
@@ -216,17 +205,26 @@ int main(int argc, char **argv) {
     cout << "SERIAL, ";
 #endif
 
-    // auto start = chrono::high_resolution_clock::now();
+    cosArr1 = vector<vector<float>>(8, vector<float>(8));
+    cosArr2 = vector<vector<float>>(8, vector<float>(8));
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            cosArr1[i][j] = cos(term1 * (i + 0.5) * j);
+            cosArr2[i][j] = cos(term2 * (i + 0.5) * j);
+        }
+    }
+
     int width, height, bpp;
     pixel_t *const img = stbi_load(path.data(), &width, &height, &bpp, 3);
+    cout << "Width: " << width << ", ";
+    cout << "Height: " << height << ", ";
 
     int add_rows = (PIXEL - (height % PIXEL) != PIXEL ? PIXEL - (height % PIXEL) : 0);
     int add_columns = (PIXEL - (width % PIXEL) != PIXEL ? PIXEL - (width % PIXEL) : 0) ;
-
     // padded dimensions to make multiples of patch size
     int _height = height + add_rows;
     int _width = width + add_columns;
-
+    // Initialize data structures
     vector<vector<int>> grayContent = initializeIntMatrix(_height, _width);
     globalDCT = initializeFloatMatrix(_height, _width);
     finalMatrixCompress = initializeIntMatrix(_height, _width);
@@ -236,8 +234,6 @@ int main(int argc, char **argv) {
     compress(img, width, height, grayContent);
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff_parallel = end - start;
-    cout << "Width: " << width << ", ";
-    cout << "Height: " << height << ", ";
 
 #if SERIAL
     string save_img = save_dir + "ser_" + img_name;

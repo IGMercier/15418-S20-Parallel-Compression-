@@ -12,11 +12,6 @@ using namespace std;
 void invDiscreteCosTransform(int R, int C) {
     int x, y, u, v;
     float cos1, cos2, temp;
-    // Useful constants.
-    float term1 = M_PI / (float)WINDOW_X;
-    float term2 = M_PI / (float)WINDOW_Y;
-    float term3 = 2. / (float)WINDOW_X;
-    float term4 = 2. / (float)WINDOW_Y;
 
     for (u = 0; u < WINDOW_X; ++u) {
         for (v = 0; v < WINDOW_Y; ++v) {
@@ -29,8 +24,8 @@ void invDiscreteCosTransform(int R, int C) {
             }
             for (x = 1; x < WINDOW_X; x++) {
                 for (y = 1; y < WINDOW_Y; y++) {
-                    cos1 = cos(term1 * (x + 0.5) * u);
-                    cos2 = cos(term2 * (y + 0.5) * v);
+                    cos1 = cosArr1[x][u];
+                    cos2 = cosArr2[y][v];
                     temp += (float)finalMatrixCompress[R + x][C + y] * cos1 * cos2;
                 }
             }
