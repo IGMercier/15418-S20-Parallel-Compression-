@@ -1,152 +1,67 @@
 #include <iostream>
 #include <cmath>
-#include <chrono>
 #include <fstream>
 #include <string>
 #include <cuda.h>
+#include <cuda_runtime.h>
+#include <driver_functions.h>
 
 #include "../include/config_cuda.hh"
-#include "../../../include/stb_image.h"
-#include "../../../include/stb_image_write.h"
-#include "dequantization.hh"
+// #include "../../../include/stb_image.h"
+// #include "../../../include/stb_image_write.h"
 
-using namespace std;
-using pixel_t = uint8_t;
-
-
-int n, m;
-
-void discreteCosTransform(vector<vector<int>> &, int, int);
-void free_mat(float **);
-void divideMatrix(vector<vector<int>> &, int, int);
+// using namespace std;
+// using pixel_t = uint8_t;
 
 
-inline int getOffset(int width, int i, int j) {
-    return (i * width + j) * 3;
-}
-
-
-int **initializeIntPointerMatrix(int rows, int cols) {
-    int **ptr = (int **) new int*[rows];
-    for (int i = 0; i < rows; i++) {
-        ptr[i] = new int[cols];
-    }
-    return ptr;
-}
-
-
-float **initializeFloatPointerMatrix(int rows, int cols) {
-    float **ptr = (float **) new float*[rows];
-    for (int i = 0; i < rows; i++) {
-        ptr[i] = (float *) new float[cols];
-    }
-    return ptr;
-}
-
-
-void freeIntMatrix(int **ptr, int rows, int cols) {
-    for (int i = 0; i < rows; i++) {
-        delete[] ptr[i];
-    }
-    delete[] ptr;
-}
-
-
-void freeFloatMatrix(float **ptr, int rows, int cols) {
-    for (int i = 0; i < rows; i++) {
-        delete[] ptr[i];
-    }
-    delete[] ptr;
-}
-
-
-void divideMatrix(vector<vector<int>> &grayContent, int n, int m) {
-    for (int i = 0; i < n; i += WINDOW_X) {
-        for (int j = 0; j < m; j += WINDOW_Y) {
-            discreteCosTransform(grayContent, i, j);
-        }
-    }
-}
-
-
-void discreteCosTransform(vector<vector<int>> &grayContent, int offsetX, int offsetY) {
-    int u, v, x, y;
-    float cos1, cos2, temp;
-    // Useful constants.
-    float term1 = M_PI / (float)WINDOW_X;
-    float term2 = M_PI / (float)WINDOW_Y;
-    float one_by_root_2 = 1.0 / sqrt(2);
-    float one_by_root_2N = 1.0 / sqrt(2 * WINDOW_X);
-
-    for (u = 0; u < WINDOW_X; ++u) {
-        for (v = 0; v < WINDOW_Y; ++v) {
-            temp = 0.0;
-            for (x = 0; x < WINDOW_X; x++) {
-                for (y = 0; y < WINDOW_Y; y++) {
-                    cos1 = cos(term1 * (x + 0.5) * u);
-                    cos2 = cos(term2 * (y + 0.5) * v);
-                    temp += grayContent[x + offsetX][y + offsetY] * cos1 * cos2;
-                }
-            }
-
-            temp *= one_by_root_2N;
-            if (u > 0) {
-                temp *= one_by_root_2;
-            }
-
-            if (v > 0) {
-                temp *= one_by_root_2;
-            }
-
-            // TODO: ensure that u + offset < i + pixel and < n
-            globalDCT[u + offsetX][v + offsetY] = temp;
-        }
-    }
-}
+// __constant__ int cudaQuantArr[WINDOW_Y][WINDOW_X];
+__constant__ int cudaQuantArr[WINDOW_Y * WINDOW_X];
+uint8_t *cudaImg;
 
 
 __device__
 void discreteCosTransformCuda(int *grayData, float *patchDCT) {
     // Put these in the read only memory.
-    float term1 = M_PI / (float)WINDOW_X;
-    float term2 = M_PI / (float)WINDOW_Y;
-    float one_by_root_2 = 1.0 / sqrt(2);
-    float one_by_root_2N = 1.0 / sqrt(2 * WINDOW_X);
+    float cos1, cos2, temp;
+    const float term1 = M_PI / (float)WINDOW_X;
+    const float term2 = M_PI / (float)WINDOW_Y;
+    const float one_by_root_2 = 1.0 / sqrtf(2);
+    const float one_by_root_2N = 1.0 / sqrtf(2 * WINDOW_X);
 
-    int temp = 0;
     int x, y;
+    temp = 0;
     for (y = 0; y < WINDOW_Y; y++) {
         for (x = 0; x < WINDOW_X; x++) {
             // These cosine values can be pre-stored for a (WINDOW_X, WINDOW_Y)
             // matrix
             // TODO: Verify the order of x and y
-            cos1 = cos(term1 * (y + 0.5) * threadIdx.y);
-            cos2 = cos(term2 * (x + 0.5) * threadIdx.x);
+            cos1 = cosf(term1 * (y + 0.5) * threadIdx.y);
+            cos2 = cosf(term2 * (x + 0.5) * threadIdx.x);
             temp += grayData[y * blockDim.x + x] * cos1 * cos2;
         }
     }
 
     temp *= one_by_root_2N;
-    if (u > 0) {
+    if (threadIdx.y > 0) {
         temp *= one_by_root_2;
     }
 
-    if (v > 0) {
+    if (threadIdx.x > 0) {
         temp *= one_by_root_2;
     }
 
     // TODO: ensure that u + offset < i + pixel and < n
-    patchDCT[threadIdx.y * blockDim.x + threadIdx.x] = temp;
+    patchDCT[threadIdx.y * blockDim.x + threadIdx.x] = (int)temp;
 }
 
 
 __device__
 void quantizeCuda(float *patchDCT, int *quantData) {
-    // TODO: Add the quant array in the read only memory
     // TODO: Use a single array for the purpose of quantizing
     int linearIdx = threadIdx.y * blockDim.x + threadIdx.x;
-    quantData[linearIdx] = round(
-        (float)patchDCT[linearIdx] / quantArr[threadIdx.x][threadIdx.y]);
+    quantData[linearIdx] = (int)round(
+        // (float)patchDCT[linearIdx] / cudaQuantArr[threadIdx.y][threadIdx.x]);
+        (float)patchDCT[linearIdx] / cudaQuantArr[linearIdx]);
 }
 
 
@@ -154,270 +69,186 @@ __device__
 void dequantizeCuda(int *quantData, int *dequantData) {
     // TODO: Use a single array for the purpose of quantizing and dequantizing
     int linearIdx = threadIdx.y * blockDim.x + threadIdx.x;
-    dequantData[linearIdx] = round(
-        quantData[linearIdx] * quantArr[threadIdx.x][threadIdx.y]);
+    // dequantData[linearIdx] = quantData[linearIdx] * cudaQuantArr[threadIdx.y][threadIdx.x];
+    dequantData[linearIdx] = quantData[linearIdx] * cudaQuantArr[linearIdx];
 }
 
 
 __device__
-void invDiscreteCosTransformCuda(int *dequantData, int *dequantData) {
+void invDiscreteCosTransformCuda(int *dequantData, int *patchInverseDCT) {
     int x, y;
     float cos1, cos2, temp;
     // Useful constants.
-    float term1 = M_PI / (float)WINDOW_X;
-    float term2 = M_PI / (float)WINDOW_Y;
-    float term3 = 2. / (float)WINDOW_X;
-    float term4 = 2. / (float)WINDOW_Y;
+    const float term1 = M_PI / (float)WINDOW_X;
+    const float term2 = M_PI / (float)WINDOW_Y;
+    const float term3 = 2. / (float)WINDOW_X;
+    const float term4 = 2. / (float)WINDOW_Y;
     // 1st value
-    temp = 1/4. * (float)dequantData[0][0];
-    // First row values
+    temp = 1/4. * (float)dequantData[0 * blockDim.x + 0];
+    // First column values
     for (y = 1; y < WINDOW_Y; y++) {
-        temp += 1/2. * (float)dequantData[y][0];
+        temp += 1/2. * (float)dequantData[y * blockDim.x + 0];
     }
-    // First col values
+    // First row values
     for (x = 1; x < WINDOW_X; x++) {
-        temp += 1/2. * (float)dequantData[0][x];
+        temp += 1/2. * (float)dequantData[0 * blockDim.x + x];
     }
 
     for (y = 1; y < WINDOW_Y; y++) {
         for (x = 1; x < WINDOW_X; x++) {
-            cos1 = cos(term1 * (y + 0.5) * threadIdx.y);
-            cos2 = cos(term2 * (x + 0.5) * threadIdx.x);
-            temp += (float)dequantData[y][x] * cos1 * cos2;
+            cos1 = cosf(term1 * (y + 0.5) * threadIdx.y);
+            cos2 = cosf(term2 * (x + 0.5) * threadIdx.x);
+            temp += (float)dequantData[y * blockDim.x + x] * cos1 * cos2;
         }
     }
 
-    dequantData[threadIdx.y * blockDim.x + threadIdx.x] = temp * term3 * term4;
+    patchInverseDCT[threadIdx.y * blockDim.x + threadIdx.x] = temp * term3 * term4;
+}
+
+
+__device__ __inline__
+int getOffset(int width, int i, int j) {
+    /**
+     *  width: image width
+     *  i: pixel row
+     *  j: pixel column
+     */
+    return (i * width + j) * NUM_CHANNELS;
 }
 
 
 __global__
-void compressCuda(int width, int height) {
+void compressCuda(uint8_t *cudaImg, int width, int height) {
     // ASSUMPTION: 8 x 8 block
     // TODO: Can save memory by using only 2 arrays
-    int num = blockDim.x * blockDim.y;
-    __shared__ pixel_t grayData[num];
+    const int num = BLOCKSIZE;
+    __shared__ int grayData[num];
     __shared__ float patchDCT[num];
     __shared__ int quantData[num];
     __shared__ int dequantData[num];
     __shared__ int patchInverseDCT[num];
 
     int add_rows = (PIXEL - (height % PIXEL) != PIXEL ? PIXEL - (height % PIXEL) : 0);
-    int add_columns = (PIXEL - (width % PIXEL) != PIXEL ? PIXEL - (width % PIXEL) : 0) ;
+    int add_columns = (PIXEL - (width % PIXEL) != PIXEL ? PIXEL - (width % PIXEL) : 0);
 
     // padded dimensions to make multiples of patch size
     int _height = height + add_rows;
-    int _width = m + add_columns;
+    int _width = width + add_columns;
 
     int blockMinX = blockIdx.x * blockDim.x;
     int blockMaxX = blockMinX + blockDim.x;
     int blockMinY = blockIdx.y * blockDim.y;
-    int blockMaxX = blockMinY + blockDim.y;
+    int blockMaxY = blockMinY + blockDim.y;
 
     blockMaxX = min(blockMaxX, _width);
     blockMaxY = min(blockMaxY, _height);
 
     int pixelX = blockMinX + threadIdx.x;
     int pixelY = blockMinY + threadIdx.y;
-    // TODO: Should it be blockDim.y or .x?
-    int linearIdx = threadIdx.y * blockDim.x + threadIdx.x;
 
-    pixel_t *bgrPixel = cudaImg[pixelY * _width + pixelX];
+    int linearIdx = threadIdx.y * blockDim.x + threadIdx.x;
+    int offset = getOffset(width, pixelY, pixelX);
+
     // Write grayscale data in `grayData` along with zero padding
     if (pixelX < width && pixelY < height) {
+        uint8_t *bgrPixel = (uint8_t *) &cudaImg[offset];
         grayData[linearIdx] = (bgrPixel[0] + bgrPixel[1] + bgrPixel[2]) / 3.f;
     } else if (pixelX >= width) {
+        // padding extra columns
         grayData[linearIdx] = 0;
     } else if (pixelY >= height) {
+        // padding extra rows
         grayData[linearIdx] = 0;
     }
-    __syncthreads();
 
-    discreteCosTransformCuda(grayData, patchDCT, width, height);
-    
+    __syncthreads();
+    discreteCosTransformCuda(grayData, patchDCT);
+
     // Might not need this
     __syncthreads();
 
     quantizeCuda(patchDCT, quantData);
+    __syncthreads();
     dequantizeCuda(quantData, dequantData);
 
     __syncthreads();
 
-    invDiscreteCosTransformCuda(int *dequantData, int *patchInverseDCT);
+    invDiscreteCosTransformCuda(dequantData, patchInverseDCT);
+    __syncthreads();
+
+    if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 2 && threadIdx.y == 3) {
+        printf("DCT value: %f\n", patchDCT[linearIdx]);
+        printf("Gray value: %d\n", grayData[linearIdx]);
+    }
+
+    // cudaImg[offset + 0] = grayData[linearIdx];
+    // cudaImg[offset + 1] = grayData[linearIdx];
+    // cudaImg[offset + 2] = grayData[linearIdx];
+
+    // cudaImg[offset + 0] = patchDCT[linearIdx];
+    // cudaImg[offset + 1] = patchDCT[linearIdx];
+    // cudaImg[offset + 2] = patchDCT[linearIdx];
 
     // Write the compressed data back to the original image.
-    bgrPixel[0] = patchInverseDCT[linearIdx];
-    bgrPixel[1] = patchInverseDCT[linearIdx];
-    bgrPixel[2] = patchInverseDCT[linearIdx];
+    // cudaImg[getOffset(width, pixelY, pixelX) + 0] = quantData[linearIdx];
+    // cudaImg[getOffset(width, pixelY, pixelX) + 1] = quantData[linearIdx];
+    // cudaImg[getOffset(width, pixelY, pixelX) + 2] = quantData[linearIdx];
+
+    cudaImg[offset + 0] = patchInverseDCT[linearIdx];
+    cudaImg[offset + 1] = patchInverseDCT[linearIdx];
+    cudaImg[offset + 2] = patchInverseDCT[linearIdx];
 }
 
 
-void compress(pixel_t *const img, int width, int height) {
-    n = height;
-    m = width;
-
-    int add_rows = (PIXEL - (n % PIXEL) != PIXEL ? PIXEL - (n % PIXEL) : 0);
-    int add_columns = (PIXEL - (m % PIXEL) != PIXEL ? PIXEL - (m % PIXEL) : 0) ;
-
-    // padded dimensions to make multiples of patch size
-    int _height = n + add_rows;
-    int _width = m + add_columns;
-
-    // Initialize data structures
-    vector<vector<int>> grayContent = initializeIntMatrix(_height, _width);
-    globalDCT = initializeFloatMatrix(_height, _width);
-    finalMatrixCompress = initializeIntMatrix(_height, _width);
-    finalMatrixDecompress = initializeIntMatrix(_height, _width);
-
-    for (int i = 0; i < n; i++) {
-        for(int j = 0; j < m; j++) {
-            pixel_t *bgrPixel = img + getOffset(width, i, j);
-            grayContent[i][j] = (bgrPixel[0] + bgrPixel[1] + bgrPixel[2]) / 3.f;
-        }
-    }
-
-    // zero-padding extra rows
-    for (int j = 0; j < m; j++) {
-        for (int i = n; i < n + add_rows; i++) {
-            grayContent[i][j] = 0;
-        }
-    }
-
-    // zero-padding extra columns
-    for (int i = 0; i < n; i++) {
-        for (int j = m; j < m + add_columns; j++) {
-            grayContent[i][j] = 0;
-        }
-    }
-
-    n = _height;      // making number of rows a multiple of 8
-    m = _width;   // making number of cols a multiple of 8
-
-#ifdef TIMER // NO_TIMER
-    auto start = chrono::high_resolution_clock::now();
-    divideMatrix(grayContent, n, m);
-    auto end = chrono::high_resolution_clock::now();
-    std::chrono::duration<double> diff = end - start;
-    cout << "DCT: " << diff.count() << ", ";
-
-    start = chrono::high_resolution_clock::now();
-    quantize(n, m);
-    end = chrono::high_resolution_clock::now();
-    diff = end - start;
-    cout << "Quant: " << diff.count() << ", ";
-
-    start = chrono::high_resolution_clock::now();
-    dequantize(n, m);
-    end = chrono::high_resolution_clock::now();
-    diff = end - start;
-    cout << "Dequant: " << diff.count() << ", ";
-
-    start = chrono::high_resolution_clock::now();
-    invDct(n, m);
-    end = chrono::high_resolution_clock::now();
-    diff = end - start;
-    cout << "IDCT: " << diff.count() << ", ";
-#else
-    divideMatrix(grayContent, n, m);
-    quantize(n, m);
-    dequantize(n, m);
-    invDct(n, m);
-#endif
-
-    for (int i = 0; i < n; i++) {
-        for(int j = 0; j < m; j++) {
-            pixel_t pixelValue = finalMatrixDecompress[i][j];
-            pixel_t *bgrPixel = img + getOffset(width, i, j);
-            bgrPixel[0] = pixelValue;
-            bgrPixel[1] = pixelValue;
-            bgrPixel[2] = pixelValue;
-        }
-    }
-}
-
-
-
-void cudaSetup(pixel_t *img, int width, int height) {
-    // grayContent = initializeIntPointerMatrix(height, width);
-    // finalMatrixCompress = initializeIntPointerMatrix(height, width);
-    // finalMatrixDecompress = initializeIntPointerMatrix(height, width);
-    // globalDCT = initializeFloatPointerMatrix(height, width);
-
+void cudaSetup(uint8_t *img, int width, int height) {
     size_t num = NUM_CHANNELS * width * height;
-    cudaMalloc(&cudaImg, sizeof(pixel_t) * num);
-    // cudaMalloc(&cudaGrayContent, sizeof(int) * num);
-    // cudaMalloc(&cudaGlobalDCT, sizeof(float) * num);
-    // cudaMalloc(&cudaFinalMatrixCompress, sizeof(int) * num);
-    // cudaMalloc(&cudaFinalMatrixDecompress, sizeof(int) * num);
-    
-    cudaMemcpy(cudaImg, img, sizeof(pixel_t) * num, cudaMemcpyHostToDevice);
-    // cudaMemcpy(cudaGrayContent, grayContent, sizeof(int) * num, cudaMemcpyHostToDevice);
-    // cudaMemcpy(cudaGlobalDCT, globalDCT, sizeof(float) * num, cudaMemcpyHostToDevice);
-    // cudaMemcpy(cudaFinalMatrixCompress, finalMatrixCompress, sizeof(int) * num, cudaMemcpyHostToDevice);
-    // cudaMemcpy(cudaFinalMatrixDecompress, finalMatrixDecompress, sizeof(int) * num, cudaMemcpyHostToDevice);
+    cudaMalloc(&cudaImg, sizeof(uint8_t) * num);
+    cudaMemcpy(cudaImg, img, sizeof(uint8_t) * num, cudaMemcpyHostToDevice);
 
-    // TODO: Shifting quant arr to the global read-only memory
+    // quantArr = new int*[WINDOW_Y];
+    // for (int i = 0; i < WINDOW_Y; i++) {
+    //     quantArr[i] = new int[WINDOW_X];
+    // }
+
+    // int quantArr[WINDOW_Y][WINDOW_X] = {{16, 11, 12, 14, 12, 10, 16, 14},
+    //                                     {13, 14, 18, 17, 16, 19, 24, 40},
+    //                                     {26, 24, 22, 22, 24, 49, 35, 37},
+    //                                     {29, 40, 58, 51, 61, 60, 57, 51},
+    //                                     {56, 55, 64, 72, 92, 78, 64, 68},
+    //                                     {87, 69, 55, 56, 80, 109, 81, 87},
+    //                                     {95, 98, 103, 104, 103, 62, 77, 113},
+    //                                     {121, 112, 100, 120, 92, 101, 103, 99}
+    //                                     };
+    int quantArr[WINDOW_Y * WINDOW_X] = {16, 11, 12, 14, 12, 10, 16, 14,
+                                         13, 14, 18, 17, 16, 19, 24, 40,
+                                         26, 24, 22, 22, 24, 49, 35, 37,
+                                         29, 40, 58, 51, 61, 60, 57, 51,
+                                         56, 55, 64, 72, 92, 78, 64, 68,
+                                         87, 69, 55, 56, 80, 109, 81, 87,
+                                         95, 98, 103, 104, 103, 62, 77, 113,
+                                         121, 112, 100, 120, 92, 101, 103, 99
+                                         };
+    cudaMemcpyToSymbol(cudaQuantArr, &quantArr, sizeof(int) * WINDOW_X * WINDOW_Y);
+
+    // TODO: Number of rows and cols should be based on the padded dimensions.
+    int rows = (height + BLK_HEIGHT - 1) / BLK_HEIGHT;
+    int cols = (width + BLK_WIDTH - 1) / BLK_WIDTH;
+    dim3 blockDim(BLK_WIDTH, BLK_HEIGHT);
+    dim3 gridDim(cols, rows);
+
+    compressCuda<<<gridDim, blockDim>>>(cudaImg, width, height);
+    cudaDeviceSynchronize();
+
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) 
+        printf("Error: %s\n", cudaGetErrorString(err));
 }
 
 
-void cudaFinish() {
+void cudaFinish(uint8_t *img, int width, int height) {
     size_t num = NUM_CHANNELS * width * height;
-    cudaMemcpy(img, cudaImg, sizeof(pixel_t) * num, cudaMemcpyDeviceToHost);
-
+    cudaMemcpy(img, cudaImg, sizeof(uint8_t) * num, cudaMemcpyDeviceToHost);
     cudaFree(cudaImg);
-    // cudaFree(cudaGrayContent);
-    // cudaFree(cudaGlobalDCT);
-    // cudaFree(cudaFinalMatrixCompress);
-    // cudaFree(cudaFinalMatrixDecompress);
+
     // TODO: Shifting quant arr to the global read-only memory
-}
-
-
-int main(int argc, char **argv) {
-    FILE *fp;
-    fp = fopen("./info.txt","a+"); 
-    // TODO: Check if dir exist
-    string img_dir = "../../images/";
-    string save_dir = "./compressed_images/";
-    string ext = ".jpg";
-
-    string img_name = argv[1] + ext;
-    string path = img_dir + img_name;
-    cout << img_name << ", ";
-
-#ifdef CUDA
-    cout << "CUDA, ";
-#endif
-
-    auto start = chrono::high_resolution_clock::now();
-    int width, height, bpp;
-    pixel_t *const img = stbi_load(path.data(), &width, &height, &bpp, 3);
-    cudaSetup(img, width, height);
-    compressCuda(width, height);
-    cudaFinish();
-
-    auto end = chrono::high_resolution_clock::now();
-    std::chrono::duration<double> diff_parallel = end - start;
-    cout << "Width: " << width << ", ";
-    cout << "Height: " << height << ", ";
-
-#if SERIAL
-    string save_img = save_dir + "ser_" + img_name;
-    stbi_write_jpg(save_img.data(), width, height, bpp, img, width * bpp);
-#else
-    string save_img = save_dir + "par_" + img_name;
-    stbi_write_jpg(save_img.data(), width, height, bpp, img, width * bpp);
-#endif
-    stbi_image_free(img);
-
-#if SERIAL
-    cout << "Serial -> ";
-#else
-    cout << "Parallel -> ";
-#endif   
-    cout << diff_parallel.count() << endl;
-
-    fprintf(fp,"%f ",(float)diff_parallel.count());
-    fclose(fp);
-    return 0;
 }
