@@ -80,7 +80,7 @@ void discreteCosTransform(vector<vector<int>> &grayContent, int offsetX, int off
             }
 
             // TODO: ensure that u + offset < i + pixel and < n
-            globalDCT[u + offsetX][v + offsetY] = temp;
+            globalDCT[u + offsetX][v + offsetY] = (int)temp;
         }
     }
 }
