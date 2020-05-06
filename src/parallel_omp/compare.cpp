@@ -13,15 +13,20 @@
 
 
 bool same(std::string &save_dir, std::string &img1, std::string &img2) {
+    // Load imagges
     int width, height, bpp;
     uint8_t *img_par = stbi_load((save_dir + img1).data(), &width, &height, &bpp, 3);
     int _width, _height, _bpp;
     uint8_t *img_ser = stbi_load((save_dir + img2).data(), &_width, &_height, &_bpp, 3);
+
+    // Check dimensions
     if (width != _width || height != _height || bpp != _bpp) {
         std::cout << "INCORRECT dimensions: " << img1 << " and " << img2;
         std::cout << std::endl;
         return false;
     }
+
+    // Check pixel values
     long error = 0;
     int max_diff = 0;
     for (int i = 0; i < height; i++) {
@@ -35,6 +40,7 @@ bool same(std::string &save_dir, std::string &img1, std::string &img2) {
 
             max_diff = std::max(max_diff, abs(bgrPixelPar[0] - bgrPixelSer[0]));
             error += !!abs(bgrPixelPar[0] - bgrPixelSer[0]);
+            // Print information about the mismatching pixels
             if (bgrPixelPar[0] != bgrPixelSer[0]) {
                 // std::cout << "H: " << i << " W: " << j << std::endl;
                 // printf("Parallel: %d\n", bgrPixelPar[0]);
@@ -42,21 +48,7 @@ bool same(std::string &save_dir, std::string &img1, std::string &img2) {
                 // break;
             }
         }
-        if (error != 0) {
-            break;
-        }
     }
-
-    // for (int i = 0; i < width * height * bpp; i++) {
-    //     max_diff = std::max(max_diff, abs(img_par[i] - img_ser[i]));
-    //     error += abs(img_par[i] - img_ser[i]);
-    //     if (abs(img_par[i] - img_ser[i]) != 0) {
-    //         std::cout << "Index: " << i << std::endl;
-    //         printf("Parallel: %d\n", img_par[i]);
-    //         printf("Serial: %d\n", img_ser[i]);
-    //         break;
-    //     }
-    // }
 
     if (error == 0) {
         std::cout << "CORRECT" << std::endl;
