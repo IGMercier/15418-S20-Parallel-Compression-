@@ -28,13 +28,14 @@ int main(int argc, char **argv) {
     cout << "CUDA, ";
 #endif
 
-    auto start = chrono::high_resolution_clock::now();
     int width, height, bpp;
     pixel_t *const img = stbi_load(path.data(), &width, &height, &bpp, 3);
     cudaSetup(img, width, height);
+    auto start = chrono::high_resolution_clock::now();
+    compress(width, height);
+    auto end = chrono::high_resolution_clock::now();
     cudaFinish(img, width, height);
 
-    auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff_parallel = end - start;
     cout << "Width: " << width << ", ";
     cout << "Height: " << height << ", ";

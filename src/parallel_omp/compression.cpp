@@ -8,6 +8,7 @@
 #include "../../include/config.hh"
 #include "../../include/stb_image.h"
 #include "../../include/stb_image_write.h"
+#include "quantization.hh"
 #include "dequantization.hh"
 
 using namespace std;
@@ -86,22 +87,24 @@ void discreteCosTransform(vector<vector<int>> &grayContent, int offsetX, int off
 }
 
 
-void compress(pixel_t *const img, int width, int height) {
+void compress(pixel_t *const img, int width, int height, vector<vector<int>> &grayContent) {
     n = height;
     m = width;
 
     int add_rows = (PIXEL - (n % PIXEL) != PIXEL ? PIXEL - (n % PIXEL) : 0);
     int add_columns = (PIXEL - (m % PIXEL) != PIXEL ? PIXEL - (m % PIXEL) : 0) ;
 
-    // padded dimensions to make multiples of patch size
-    int _height = n + add_rows;
-    int _width = m + add_columns;
+    // // padded dimensions to make multiples of patch size
+    // int _height = n + add_rows;
+    // int _width = m + add_columns;
+    int _height = grayContent.size();
+    int _width = grayContent[0].size();
 
     // Initialize data structures
-    vector<vector<int>> grayContent = initializeIntMatrix(_height, _width);
-    globalDCT = initializeFloatMatrix(_height, _width);
-    finalMatrixCompress = initializeIntMatrix(_height, _width);
-    finalMatrixDecompress = initializeIntMatrix(_height, _width);
+    // vector<vector<int>> grayContent = initializeIntMatrix(_height, _width);
+    // globalDCT = initializeFloatMatrix(_height, _width);
+    // finalMatrixCompress = initializeIntMatrix(_height, _width);
+    // finalMatrixDecompress = initializeIntMatrix(_height, _width);
 
 #if !SERIAL
 #ifdef OMP
@@ -139,10 +142,10 @@ void compress(pixel_t *const img, int width, int height) {
         }
     }
 
-    n = _height;      // making number of rows a multiple of 8
+    n = _height;  // making number of rows a multiple of 8
     m = _width;   // making number of cols a multiple of 8
 
-#ifdef TIMER // NO_TIMER
+#ifdef TIMER
     auto start = chrono::high_resolution_clock::now();
     divideMatrix(grayContent, n, m);
     auto end = chrono::high_resolution_clock::now();
@@ -187,8 +190,6 @@ void compress(pixel_t *const img, int width, int height) {
             bgrPixel[2] = pixelValue;
         }
     }
-
-    // free(grayContent);
 }
 
 
@@ -211,11 +212,28 @@ int main(int argc, char **argv) {
 #ifdef SIMD
     cout << "SIMD, ";
 #endif
+#if SERIAL
+    cout << "SERIAL, ";
+#endif
 
-    auto start = chrono::high_resolution_clock::now();
+    // auto start = chrono::high_resolution_clock::now();
     int width, height, bpp;
     pixel_t *const img = stbi_load(path.data(), &width, &height, &bpp, 3);
-    compress(img, width, height);
+
+    int add_rows = (PIXEL - (height % PIXEL) != PIXEL ? PIXEL - (height % PIXEL) : 0);
+    int add_columns = (PIXEL - (width % PIXEL) != PIXEL ? PIXEL - (width % PIXEL) : 0) ;
+
+    // padded dimensions to make multiples of patch size
+    int _height = height + add_rows;
+    int _width = width + add_columns;
+
+    vector<vector<int>> grayContent = initializeIntMatrix(_height, _width);
+    globalDCT = initializeFloatMatrix(_height, _width);
+    finalMatrixCompress = initializeIntMatrix(_height, _width);
+    finalMatrixDecompress = initializeIntMatrix(_height, _width);
+
+    auto start = chrono::high_resolution_clock::now();
+    compress(img, width, height, grayContent);
     auto end = chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff_parallel = end - start;
     cout << "Width: " << width << ", ";
