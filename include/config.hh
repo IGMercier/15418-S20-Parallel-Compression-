@@ -9,7 +9,7 @@
 #define WINDOW_X 8
 #define WINDOW_Y 8
 
-#define SERIAL 0
+#define SERIAL 1
 #if !SERIAL
 #define OMP
 #endif
