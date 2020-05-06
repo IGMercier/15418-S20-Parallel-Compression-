@@ -24,16 +24,45 @@ bool same(std::string &save_dir, std::string &img1, std::string &img2) {
     }
     long error = 0;
     int max_diff = 0;
-    for (int i = 0; i < width * height * bpp; i++) {
-        max_diff = std::max(max_diff, abs(img_par[i] - img_ser[i]));
-        error += abs(img_par[i] - img_ser[i]);
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            uint8_t *bgrPixelPar = img_par + (i * width + j) * 3;
+            uint8_t *bgrPixelSer = img_ser + (i * width + j) * 3;
+            if (bgrPixelPar[0] != bgrPixelPar[1] || bgrPixelPar[0] != bgrPixelPar[2]
+                || bgrPixelSer[0] != bgrPixelSer[1] || bgrPixelSer[0] != bgrPixelSer[2]) {
+                std::cout << "Pixel values across channels are not same" << std::endl;
+            }
+
+            max_diff = std::max(max_diff, abs(bgrPixelPar[0] - bgrPixelSer[0]));
+            error += !!abs(bgrPixelPar[0] - bgrPixelSer[0]);
+            if (bgrPixelPar[0] != bgrPixelSer[0]) {
+                // std::cout << "H: " << i << " W: " << j << std::endl;
+                // printf("Parallel: %d\n", bgrPixelPar[0]);
+                // printf("Serial: %d\n", bgrPixelSer[0]);
+                // break;
+            }
+        }
+        if (error != 0) {
+            break;
+        }
     }
+
+    // for (int i = 0; i < width * height * bpp; i++) {
+    //     max_diff = std::max(max_diff, abs(img_par[i] - img_ser[i]));
+    //     error += abs(img_par[i] - img_ser[i]);
+    //     if (abs(img_par[i] - img_ser[i]) != 0) {
+    //         std::cout << "Index: " << i << std::endl;
+    //         printf("Parallel: %d\n", img_par[i]);
+    //         printf("Serial: %d\n", img_ser[i]);
+    //         break;
+    //     }
+    // }
 
     if (error == 0) {
         std::cout << "CORRECT" << std::endl;
     } else {
         std::cout << "INCORRECT: " << img1 << " and " << img2;
-        std::cout << " Error: " << error << " Max diff: " << max_diff;
+        std::cout << " | Num different values: " << error << " | Max diff: " << max_diff;
         std::cout << std::endl;
     }
 
@@ -42,6 +71,7 @@ bool same(std::string &save_dir, std::string &img1, std::string &img2) {
 
 
 int main() {
+    std::cout << "*********" << " COMPARISON " << "*********" << std::endl;
     std::vector<std::string> par_files, ser_files;
     std::string file = "", refined_file = "";
     std::string save_dir = "./compressed_images/";
