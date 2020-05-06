@@ -19,8 +19,8 @@ uint8_t *cudaImg;
 __device__
 void discreteCosTransformCuda(const int *grayData, float *patchDCT, int offset, const int &linearIdx) {
     float cos1, cos2, temp;
-    int tx = threadIdx.x % 8;
-    int ty = threadIdx.y % 8;
+    int tx = threadIdx.x % WINDOW_X;
+    int ty = threadIdx.y % WINDOW_Y;
     int offsetX = (int)(threadIdx.x / WINDOW_X) * WINDOW_X;
     int offsetY = (int)(threadIdx.y / WINDOW_Y) * WINDOW_Y;
     int x, y;
@@ -49,8 +49,8 @@ void discreteCosTransformCuda(const int *grayData, float *patchDCT, int offset, 
 
 __device__ __inline__
 void quantizeCuda(const float *patchDCT, int *quantData, const int &linearIdx) {
-    int tx = threadIdx.x % 8;
-    int ty = threadIdx.y % 8;
+    int tx = threadIdx.x % WINDOW_X;
+    int ty = threadIdx.y % WINDOW_Y;
     quantData[linearIdx] = (int)roundf((float)patchDCT[linearIdx]
                                        / cudaQuantArr[ty * WINDOW_Y + tx]);
 }
@@ -58,8 +58,8 @@ void quantizeCuda(const float *patchDCT, int *quantData, const int &linearIdx) {
 
 __device__ __inline__
 void dequantizeCuda(const int *quantData, int *dequantData, const int &linearIdx) {
-    int tx = threadIdx.x % WINDOW_Y;
-    int ty = threadIdx.y % WINDOW_X;
+    int tx = threadIdx.x % WINDOW_X;
+    int ty = threadIdx.y % WINDOW_Y;
     dequantData[linearIdx] = quantData[linearIdx] * cudaQuantArr[ty * WINDOW_Y + tx];
 }
 
@@ -68,8 +68,8 @@ __device__
 void invDiscreteCosTransformCuda(const int *dequantData, int *patchInverseDCT, int offset, const int &linearIdx) {
     int x, y;
     float cos1, cos2, temp;
-    int tx = threadIdx.x % WINDOW_Y;
-    int ty = threadIdx.y % WINDOW_X;
+    int tx = threadIdx.x % WINDOW_X;
+    int ty = threadIdx.y % WINDOW_Y;
     int offsetX = (int)(threadIdx.x / WINDOW_X) * WINDOW_X;
     int offsetY = (int)(threadIdx.y / WINDOW_Y) * WINDOW_Y;
 
