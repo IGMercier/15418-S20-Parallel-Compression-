@@ -101,7 +101,7 @@ int main() {
         }
 
         if (!same(save_dir, par_files[i], ser_files[i])) {
-            break;
+            // break;
         }
     }
     
