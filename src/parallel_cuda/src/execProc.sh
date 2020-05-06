@@ -3,7 +3,7 @@ rm info.txt
 make clean
 make all
 a=0
-while [ "$a" -lt 1 ]    # this is loop1
+while [ "$a" -lt 30 ]    # this is loop1
 do
   ./compressor "$a"
   a=`expr $a + 1`

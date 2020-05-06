@@ -45,4 +45,5 @@ extern uint8_t *cudaImg;
 
 // CUDA functions
 void cudaSetup(uint8_t *img, int width, int height);
+void compress(int width, int height);
 void cudaFinish(uint8_t *img, int width, int height);
