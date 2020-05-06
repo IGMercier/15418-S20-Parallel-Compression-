@@ -28,20 +28,7 @@
 #define NUM_CHANNELS 3
 
 /* Important data structures */
-// using pixel_t = uint8_t;
-
 extern uint8_t *cudaImg;
-// uint8_t *cudaGrayContent;
-// int *cudaFinalMatrixCompress;
-// int *cudaFinalMatrixDecompress;
-// float *cudaGlobalDCT;
-// int **cudaQuantArr;
-
-/* Important data structures */
-// float *globalDCT;
-// int *finalMatrixCompress;
-// int *finalMatrixDecompress;
-// int **quantArr;
 
 // CUDA functions
 void cudaSetup(uint8_t *img, int width, int height);
