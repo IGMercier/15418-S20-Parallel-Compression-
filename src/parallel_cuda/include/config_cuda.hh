@@ -12,14 +12,13 @@
 #define SERIAL 0
 #if !SERIAL
 #define CUDA
-#define OMP
 #endif
 
 /* If CUDA is defined */
 #ifdef CUDA
 
-#define BLK_WIDTH 32
-#define BLK_HEIGHT 32
+#define BLK_WIDTH 8
+#define BLK_HEIGHT 8
 #define BLOCKSIZE (BLK_HEIGHT * BLK_WIDTH)
 
 #endif
@@ -29,18 +28,21 @@
 #define NUM_CHANNELS 3
 
 /* Important data structures */
-using pixel_t = uint8_t;
+// using pixel_t = uint8_t;
 
-pixel_t *cudaImg;
-pixel_t *cudaGrayContent;
-int *cudaFinalMatrixCompress;
-int *cudaFinalMatrixDecompress;
-float *cudaGlobalDCT;
+extern uint8_t *cudaImg;
+// uint8_t *cudaGrayContent;
+// int *cudaFinalMatrixCompress;
+// int *cudaFinalMatrixDecompress;
+// float *cudaGlobalDCT;
+// int **cudaQuantArr;
 
 /* Important data structures */
-float *globalDCT;
-int *finalMatrixCompress;
-int *finalMatrixDecompress;
+// float *globalDCT;
+// int *finalMatrixCompress;
+// int *finalMatrixDecompress;
+// int **quantArr;
 
 // CUDA functions
-// void cudaSetup();
+void cudaSetup(uint8_t *img, int width, int height);
+void cudaFinish(uint8_t *img, int width, int height);
