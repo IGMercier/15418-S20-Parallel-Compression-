@@ -18,6 +18,7 @@
 #define NUM_CHANNELS 3
 
 /* Important data structures */
+std::vector<std::vector<int>> grayContent;
 std::vector<std::vector<float>> globalDCT;
 std::vector<std::vector<int>> finalMatrixCompress;
 std::vector<std::vector<int>> finalMatrixDecompress;
