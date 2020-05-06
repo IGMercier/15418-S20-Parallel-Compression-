@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
@@ -34,3 +32,11 @@ extern uint8_t *cudaImg;
 void cudaSetup(uint8_t *img, int width, int height);
 void compress(int width, int height);
 void cudaFinish(uint8_t *img, int width, int height);
+
+// Useful constants
+const float term1 = M_PI / (float)WINDOW_X;
+const float term2 = M_PI / (float)WINDOW_Y;
+const float term3 = 2. / (float)WINDOW_X;
+const float term4 = 2. / (float)WINDOW_Y;
+const float one_by_root_2 = 1.0 / sqrt(2);
+const float one_by_root_2N = 1.0 / sqrt(2 * WINDOW_X);
