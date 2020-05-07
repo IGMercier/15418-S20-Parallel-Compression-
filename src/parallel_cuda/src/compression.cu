@@ -205,6 +205,7 @@ void cudaSetup(uint8_t *img, int width, int height) {
 
 void compress(int width, int height) {
     // TODO: Number of rows and cols should be based on the padded dimensions.
+    // Or not?
     int rows = (height + BLK_HEIGHT - 1) / BLK_HEIGHT;
     int cols = (width + BLK_WIDTH - 1) / BLK_WIDTH;
     dim3 blockDim(BLK_WIDTH, BLK_HEIGHT);
