@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
     fp = fopen("./info.txt","a+"); 
     omp_set_num_threads(NUM_THREADS);
     // TODO: Check if dir exist
-    string img_dir = "../../images/";
+    string img_dir = "../../../images/";
     string save_dir = "./compressed_images/";
     string ext = ".jpg";
 
